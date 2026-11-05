@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>설비별 주간·월간 불량 집계 및 손실 분석 대시보드</title>
+  <title>통합 제조 생산 및 품질 모니터링 포털</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -13,13 +13,13 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- SheetJS (Excel Parser & Exporter) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- PptxGenJS (PowerPoint Presentation Generator) -->
+  <!-- PptxGenJS -->
   <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
-  <!-- Google Fonts: Noto Sans KR -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -27,6 +27,13 @@
         extend: {
           fontFamily: {
             sans: ['"Noto Sans KR"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              600: '#16a34a',
+              900: '#14532d',
+            }
           }
         }
       }
@@ -35,7 +42,7 @@
 
   <style>
     body {
-      background-color: #f8fafc;
+      background-color: #0f172a;
       color: #1e293b;
       font-family: 'Noto Sans KR', sans-serif;
       user-select: none;
@@ -62,13 +69,30 @@
       0%, 100% { opacity: 1; }
       50% { opacity: .4; }
     }
+    .hero-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    }
+    .glow-card:hover {
+      box-shadow: 0 0 35px -5px rgba(225, 29, 72, 0.3);
+    }
+    .glow-card-blue:hover {
+      box-shadow: 0 0 35px -5px rgba(37, 99, 235, 0.3);
+    }
+    .glow-card-emerald:hover {
+      box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.3);
+    }
 
     @media print {
       header,
       #fileDropBanner,
       #filterToolbarSection,
       .no-print,
-      .action-column {
+      .action-column,
+      #coverSection,
+      #portalGlobalNav {
         display: none !important;
       }
       body {
@@ -87,39 +111,162 @@
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-rose-100 selection:text-rose-800" oncontextmenu="return false;">
+<body class="min-h-screen flex flex-col antialiased bg-slate-900 text-slate-800" oncontextmenu="return false;">
 
-  <!-- 대시보드 접근 암호화 보안 잠금 모달 -->
-  <div id="securityLockModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden p-6 text-center space-y-4">
-      <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-        <i data-lucide="shield-lock" class="w-6 h-6"></i>
+  <!-- ======================================================== -->
+  <!-- 0. 보안 잠금 모달 (비밀번호: 5555) -->
+  <!-- ======================================================== -->
+  <div id="securityLockModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden p-7 text-center space-y-4">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner border border-rose-100">
+        <i data-lucide="shield-check" class="w-7 h-7"></i>
       </div>
       <div>
-        <h3 class="text-base font-bold text-slate-800 tracking-tight">시스템 접근 보안 인증</h3>
-        <p class="text-xs text-slate-500 mt-1">대시보드를 열람하려면 비밀번호를 입력하세요.</p>
+        <span class="text-[11px] font-bold tracking-widest text-rose-600 uppercase bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">Security Access</span>
+        <h3 class="text-lg font-extrabold text-slate-900 tracking-tight mt-2">제조 모니터링 포털 인증</h3>
+        <p class="text-xs text-slate-500 mt-1">대시보드 접근 권한 암호를 입력해 주세요.</p>
       </div>
-      <form onsubmit="verifyDashboardAccess(event)" class="space-y-3">
+      <form onsubmit="verifyDashboardAccess(event)" class="space-y-3 pt-2">
         <input 
           type="password" 
           id="systemPasswordInput" 
-          placeholder="비밀번호 입력..." 
-          class="w-full px-3 py-2 text-center text-sm font-semibold rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:outline-none tracking-widest"
+          placeholder="인증 암호 입력..." 
+          class="w-full px-4 py-3 text-center text-base font-bold rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:outline-none tracking-widest bg-slate-50"
           autofocus 
         />
         <button 
           type="submit" 
-          class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-200"
+          class="w-full py-3 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-200 active:scale-[0.98]"
         >
-          인증 확인 및 접속
+          인증 확인 및 포털 진입
         </button>
       </form>
-      <div id="securityErrorMsg" class="text-xs text-rose-600 font-semibold hidden">비밀번호가 올바르지 않습니다.</div>
+      <div id="securityErrorMsg" class="text-xs text-rose-600 font-bold hidden bg-rose-50 py-1.5 rounded-lg border border-rose-200">
+        인증 암호가 일치하지 않습니다. (기본: 5555)
+      </div>
+      <div class="text-[11px] text-slate-400">보안 키: 5555</div>
     </div>
   </div>
 
-  <div id="mainDashboardApp" class="flex-1 flex flex-col blur-sm pointer-events-none transition-all duration-300">
-    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
+  <!-- ======================================================== -->
+  <!-- 포털 최상단 공통 글로벌 네비게이션 헤더 -->
+  <!-- ======================================================== -->
+  <nav id="portalGlobalNav" class="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-white sticky top-0 z-40 no-print transition-all">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('cover')">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
+          <i data-lucide="factory" class="w-4 h-4"></i>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold text-sm sm:text-base tracking-tight text-white">SMART MFG PORTAL</span>
+          <span class="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-medium">통합 생산·품질 본부</span>
+        </div>
+      </div>
+
+      <!-- 상단 메뉴 라우팅 탭 -->
+      <div class="flex items-center gap-1.5 text-xs font-semibold">
+        <button onclick="navigateTo('cover')" id="navBtnCover" class="px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 bg-slate-800 text-rose-400 font-bold border border-slate-700">
+          <i data-lucide="layout" class="w-3.5 h-3.5"></i>
+          <span>표지 (Home)</span>
+        </button>
+        <button onclick="navigateTo('defect')" id="navBtnDefect" class="px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i data-lucide="alert-octagon" class="w-3.5 h-3.5 text-rose-500"></i>
+          <span class="hidden md:inline">설비별 불량 집계</span>
+          <span class="md:hidden">불량</span>
+        </button>
+        <button onclick="navigateTo('production')" id="navBtnProduction" class="px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i data-lucide="calendar-check-2" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span class="hidden md:inline">생산 계획 및 가동</span>
+          <span class="md:hidden">생산계획</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- 1. PPT 표지 (Executive Cover / Portal Home Hub) -->
+  <!-- ======================================================== -->
+  <section id="coverSection" class="relative flex-1 flex flex-col justify-center items-center px-4 py-12 hero-grid overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+    <!-- 배경 글로우 이펙트 -->
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="max-w-5xl w-full mx-auto space-y-10 z-10 my-auto text-center">
+      <!-- 프레젠테이션 타이틀 블록 -->
+      <div class="space-y-4">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-rose-400 text-xs font-semibold shadow-inner">
+          <span class="w-2 h-2 rounded-full bg-rose-500 badge-pulse"></span>
+          프레스 설비 제조 공정 실시간 데이터 허브
+        </div>
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
+          통합 제조 생산 및 품질 모니터링
+        </h1>
+        <p class="text-sm sm:text-lg text-slate-400 max-w-2xl mx-auto font-normal">
+          설비별 주간·월간 불량 집계 및 손실 분석부터 생산 라인별 실시간 계획 달성률까지 원스톱으로 관리합니다.
+        </p>
+      </div>
+
+      <!-- 선택 대시보드 진입 타일형 카드 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 text-left">
+        <!-- 1번 카드: 설비별 불량 집계 -->
+        <div onclick="navigateTo('defect')" class="glow-card group cursor-pointer bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 hover:border-rose-500/80 rounded-3xl p-7 transition-all duration-300 relative flex flex-col justify-between overflow-hidden shadow-xl">
+          <div class="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                <i data-lucide="flame" class="w-6 h-6"></i>
+              </div>
+              <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">품질 관리 (QA)</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-rose-400 transition-colors">설비별 불량 집계 및 손실 분석</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              3개 주차 연속 정렬, 9대 불량유형 분석, 손실액 피벗 매트릭스 및 엑셀 파싱/동기화 심층 대시보드
+            </p>
+          </div>
+          <div class="mt-6 pt-4 border-t border-slate-700/50 flex items-center justify-between text-xs font-semibold text-rose-400">
+            <span>대시보드 열기</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform"></i>
+          </div>
+        </div>
+
+        <!-- 2번 카드: 생산 계획 및 가동 현황 -->
+        <div onclick="navigateTo('production')" class="glow-card-blue group cursor-pointer bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 hover:border-blue-500/80 rounded-3xl p-7 transition-all duration-300 relative flex flex-col justify-between overflow-hidden shadow-xl">
+          <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <i data-lucide="gauge" class="w-6 h-6"></i>
+              </div>
+              <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">생산 관리 (MES)</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">생산 계획 및 가동 현황</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              대형 TR·PR / 소형 / 자동화 라인별 일일·주간 계획 수량 대비 실적 달성률 및 설비 가동 상태 모니터링
+            </p>
+          </div>
+          <div class="mt-6 pt-4 border-t border-slate-700/50 flex items-center justify-between text-xs font-semibold text-blue-400">
+            <span>대시보드 열기</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 공정 현황 요약 태그 바 -->
+      <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400 pt-6">
+        <span class="flex items-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> 프레스 15대 설비 연계</span>
+        <span class="text-slate-700">•</span>
+        <span class="flex items-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> 4대 라인 실시간 비교</span>
+        <span class="text-slate-700">•</span>
+        <span class="flex items-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> 엑셀 동기화 지원</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 2. 기존: 설비별 주간·월간 불량 집계 및 손실 분석 대시보드 -->
+  <!-- ======================================================== -->
+  <div id="defectDashboardSection" class="hidden flex-1 flex flex-col bg-slate-50 transition-all">
+    <header class="sticky top-14 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center space-x-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center text-white shadow-md shadow-rose-200">
@@ -128,7 +275,7 @@
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">설비별 주간·월간 불량 집계 대시보드</h1>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">보안 강화 v7</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">품질 v7</span>
             </div>
             <p class="text-xs text-slate-500 hidden sm:block">설비별 3개 주차 연속 정렬 및 고시인성 비교 대시보드</p>
           </div>
@@ -312,7 +459,7 @@
         </div>
       </div>
 
-      <!-- Charts Section (주차별 추이 & 라인/설비별 비교) -->
+      <!-- Charts Section -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -407,7 +554,7 @@
           </table>
         </div>
 
-        <!-- Detailed 3-Week Grouped Table View (정렬 및 너비 개선) -->
+        <!-- Detailed 3-Week Grouped Table View -->
         <div id="detailedViewContainer" class="overflow-x-auto hidden">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
@@ -448,6 +595,166 @@
     </main>
   </div>
 
+  <!-- ======================================================== -->
+  <!-- 3. 신규: 생산 계획 및 가동 현황 대시보드 (MES/생산관리) -->
+  <!-- ======================================================== -->
+  <div id="productionDashboardSection" class="hidden flex-1 flex flex-col bg-slate-50 transition-all">
+    <header class="sticky top-14 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-200">
+            <i data-lucide="gauge" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">생산 계획 및 가동 현황 대시보드</h1>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">생산 MES</span>
+            </div>
+            <p class="text-xs text-slate-500 hidden sm:block">일자별·호기별 생산 계획량 대비 실적 달성률 및 설비 가동 모니터링</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="refreshProductionData()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors shadow-sm">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span>현황 갱신</span>
+          </button>
+          <button onclick="window.print()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors shadow-sm">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">인쇄</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- 생산 KPI 4종 카드 -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">당일 총 계획량</span>
+            <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <span id="kpiPlanQty" class="text-2xl sm:text-3xl font-bold text-slate-800">42,500</span>
+            <span class="text-xs font-semibold text-blue-600">EA</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">15대 전 설비 합산 목표</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">당일 총 생산 실적</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <span id="kpiActualQty" class="text-2xl sm:text-3xl font-bold text-emerald-600">39,420</span>
+            <span class="text-xs font-semibold text-emerald-700">EA</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">진행률: <span class="font-bold text-emerald-600">92.8%</span></div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">평균 종합 가동률</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="activity" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <span class="text-2xl sm:text-3xl font-bold text-indigo-600">88.5</span>
+            <span class="text-xs font-semibold text-indigo-700">%</span>
+          </div>
+          <div class="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> 전주 대비 +2.4% 개선
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">가동 설비 현황</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <i data-lucide="power" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <span class="text-2xl sm:text-3xl font-bold text-slate-800">13 <span class="text-base text-slate-400 font-normal">/ 15</span></span>
+            <span class="text-xs font-semibold text-rose-600">대 가동</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-500">정지 1대 (금형수리) / 대기 1대</div>
+        </div>
+      </div>
+
+      <!-- 생산 진척 차트 및 라인별 달성률 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+              <i data-lucide="bar-chart" class="w-4 h-4 text-blue-600"></i>
+              <span>라인별 계획량 대비 생산 실적</span>
+            </h3>
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">단위: EA</span>
+          </div>
+          <div class="relative w-full h-[280px]">
+            <canvas id="prodLineChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i>
+              <span>설비 실시간 운전 상태 현황</span>
+            </h3>
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">실시간</span>
+          </div>
+          <div class="relative w-full h-[280px] flex items-center justify-center">
+            <canvas id="prodStatusDonutChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 실시간 설비별 생산 현황 테이블 -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2">
+            <i data-lucide="list-checks" class="w-5 h-5 text-blue-600"></i>
+            <h2 class="font-bold text-slate-800 text-base">호기별 일일 생산 계획 및 달성 현황</h2>
+          </div>
+          <span class="text-xs text-slate-500 font-medium">기준: 주간 작업(08:00~17:00)</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-900 text-white font-semibold text-center">
+                <th class="py-3 px-3 text-left">설비명</th>
+                <th class="py-3 px-3">소속 라인</th>
+                <th class="py-3 px-3 text-center">운전 상태</th>
+                <th class="py-3 px-3 text-right">계획 수량 (EA)</th>
+                <th class="py-3 px-3 text-right">실적 수량 (EA)</th>
+                <th class="py-3 px-3 text-center">달성률 (%)</th>
+                <th class="py-3 px-3 text-center">가동률 (%)</th>
+                <th class="py-3 px-3 text-left">진행 차종 / 품명</th>
+              </tr>
+            </thead>
+            <tbody id="productionTableBody" class="divide-y divide-slate-200 text-slate-700">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 붙여넣기 모달 (기존 코드 기능 유지) -->
+  <!-- ======================================================== -->
   <div id="pasteModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -481,16 +788,21 @@
     </div>
   </div>
 
+  <!-- 공통 토스트 알림 메시지 -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 text-white text-xs sm:text-sm shadow-xl border border-slate-800">
     <div id="toastIcon"></div>
     <span id="toastMessage">알림</span>
   </div>
 
+  <!-- ======================================================== -->
+  <!-- 스크립트 로직 (라우팅, 품질 대시보드 로직, 생산 대시보드 로직) -->
+  <!-- ======================================================== -->
   <script>
-    // ==========================================
-    // 0. 보안 및 무단 복사/수정 방지 스크립트
-    // ==========================================
-    const DASHBOARD_PASS = '5555'; // 접속 비밀번호 (필요시 변경)
+    // ----------------------------------------------------
+    // 1. 보안 잠금 & 라우팅 시스템
+    // ----------------------------------------------------
+    const DASHBOARD_PASS = '5555';
+    let currentRoute = 'cover'; // 'cover', 'defect', 'production'
 
     function verifyDashboardAccess(e) {
       e.preventDefault();
@@ -498,8 +810,6 @@
       const errorMsg = document.getElementById('securityErrorMsg');
       if (input === DASHBOARD_PASS) {
         document.getElementById('securityLockModal').classList.add('hidden');
-        const mainApp = document.getElementById('mainDashboardApp');
-        mainApp.classList.remove('blur-sm', 'pointer-events-none');
         sessionStorage.setItem('_db_access_auth_', 'granted');
         showToast('접근 인증 완료', 'success');
       } else {
@@ -508,7 +818,7 @@
       }
     }
 
-    // 개발자 도구 및 소스 보기 키 조합 방지
+    // 개발자 도구 방지 등 키보드 보안
     window.addEventListener('keydown', function (e) {
       if (
         e.key === 'F12' ||
@@ -522,6 +832,48 @@
       }
     });
 
+    function navigateTo(route) {
+      currentRoute = route;
+      const cover = document.getElementById('coverSection');
+      const defect = document.getElementById('defectDashboardSection');
+      const prod = document.getElementById('productionDashboardSection');
+
+      // 섹션 토글
+      cover.classList.add('hidden');
+      defect.classList.add('hidden');
+      prod.classList.add('hidden');
+
+      // 헤더 버튼 스타일 리셋
+      ['navBtnCover', 'navBtnDefect', 'navBtnProduction'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = 'px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white';
+      });
+
+      if (route === 'cover') {
+        cover.classList.remove('hidden');
+        document.getElementById('navBtnCover').className = 'px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 bg-slate-800 text-rose-400 font-bold border border-slate-700';
+      } else if (route === 'defect') {
+        defect.classList.remove('hidden');
+        document.getElementById('navBtnDefect').className = 'px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 bg-rose-600 text-white font-bold shadow-sm';
+        setTimeout(() => {
+          if (trendChartInstance) trendChartInstance.resize();
+          if (lineChartInstance) lineChartInstance.resize();
+        }, 50);
+      } else if (route === 'production') {
+        prod.classList.remove('hidden');
+        document.getElementById('navBtnProduction').className = 'px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 bg-blue-600 text-white font-bold shadow-sm';
+        setTimeout(() => {
+          if (prodLineChartInstance) prodLineChartInstance.resize();
+          if (prodStatusDonutInstance) prodStatusDonutInstance.resize();
+        }, 50);
+      }
+      lucide.createIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ----------------------------------------------------
+    // 2. 기존 품질/불량 집계 대시보드 로직
+    // ----------------------------------------------------
     const DEFECT_KEYS = [
       { key: 'mat', label: '소재불량(녹)' },
       { key: 'setup', label: '셋업품' },
@@ -535,7 +887,6 @@
     ];
 
     const STANDARD_MACHINES = [
-      // 1. 대형프레스 (TR)
       { name: '대형 500톤 1호기', group: '대형프레스(TR)' },
       { name: '대형 500톤 2호기', group: '대형프레스(TR)' },
       { name: '대형 500톤 3호기', group: '대형프레스(TR)' },
@@ -544,18 +895,12 @@
       { name: '대형 600톤 3호기', group: '대형프레스(TR)' },
       { name: '대형 800톤 2호기', group: '대형프레스(TR)' },
       { name: '대형 프레스 라인', group: '대형프레스(TR)' },
-
-      // 2. 대형프레스 (PR)
       { name: '대형 800톤 1호기', group: '대형프레스(PR)' },
       { name: '대형 400톤 1호기', group: '대형프레스(PR)' },
-
-      // 3. 소형프레스 (200T~250-3)
       { name: '200T', group: '소형프레스' },
       { name: '250T-1', group: '소형프레스' },
       { name: '250T-2', group: '소형프레스' },
       { name: '250T-3', group: '소형프레스' },
-
-      // 4. 자동화 프레스 (로봇/셔틀/650T)
       { name: '로봇2라인 (250톤)', group: '자동화 프레스' },
       { name: '셔틀 400톤', group: '자동화 프레스' },
       { name: '650톤 트렌스퍼 1호기', group: '자동화 프레스' }
@@ -678,7 +1023,6 @@
                 ctx.fillStyle = '#be123c';
                 ctx.fillText(text, element.x, element.y - 12);
               }
-
             } else if (dataset.type === 'line') {
               const text = `${Math.round(val).toLocaleString()}만`;
               const textWidth = ctx.measureText(text).width;
@@ -695,7 +1039,6 @@
               ctx.fillStyle = '#92400e';
               ctx.fillText(text, element.x, pointY);
             }
-
             ctx.restore();
           });
         });
@@ -1210,7 +1553,6 @@
       tfoot.innerHTML = `<tr><td colspan="${isGroupByLineChecked ? 1 : 2}" class="py-3 px-4 text-center font-bold bg-slate-300">주차별 총 합계 (수량 | 금액)</td>${footWeekCells}<td class="py-3 px-3 text-center font-extrabold text-rose-800 bg-rose-200">${totalQtySum.toLocaleString()}</td><td class="py-3 px-3 text-right font-extrabold text-rose-900 bg-rose-200">₩${totalLossSum.toLocaleString()}</td></tr>`;
     }
 
-    // [정렬/간격 개선] 설비명 텍스트 줄바꿈 방지 및 라인구분 뱃지 정렬
     function renderGroupedDetailedMatrixTable() {
       const tbody = document.getElementById('matrixTableBody');
       const tfoot = document.getElementById('matrixTableFoot');
@@ -1236,8 +1578,6 @@
 
         let mSubQty = 0, mSubLoss = 0;
         const mSubDefects = { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 };
-
-        // 라인구분 텍스트를 "대형프레스"와 "(TR)"으로 깔끔하게 줄바꿈 분리
         const formattedGroup = mMeta.group.replace('(', '<br>(');
 
         sortedWeeksDesc.forEach((w, wIdx) => {
@@ -1381,6 +1721,122 @@
       showToast('엑셀 파일 다운로드 완료', 'success');
     }
 
+    // ----------------------------------------------------
+    // 3. 신규: 생산 계획 및 가동 현황 대시보드 로직
+    // ----------------------------------------------------
+    const PRODUCTION_MOCK_DATA = [
+      { machine: '대형 500톤 1호기', group: '대형프레스(TR)', status: 'RUN', plan: 3800, actual: 3620, model: 'NX4 센터 플로어', oee: 92.1 },
+      { machine: '대형 500톤 2호기', group: '대형프레스(TR)', status: 'RUN', plan: 3500, actual: 3410, model: 'GN7 사이드 아우터', oee: 89.5 },
+      { machine: '대형 500톤 3호기', group: '대형프레스(TR)', status: 'RUN', plan: 3200, actual: 3180, model: 'MQ4 휠하우스', oee: 94.2 },
+      { machine: '대형 600톤 1호기', group: '대형프레스(TR)', status: 'STOP', plan: 2500, actual: 1100, model: 'DL3 루프 판넬 (금형보수)', oee: 45.0 },
+      { machine: '대형 600톤 2호기', group: '대형프레스(TR)', status: 'RUN', plan: 3000, actual: 2950, model: 'KA4 프론트 후드', oee: 91.8 },
+      { machine: '대형 600톤 3호기', group: '대형프레스(TR)', status: 'RUN', plan: 2800, actual: 2710, model: 'MX5 테일게이트', oee: 88.0 },
+      { machine: '대형 800톤 2호기', group: '대형프레스(TR)', status: 'RUN', plan: 2400, actual: 2320, model: 'RG3 프론트 펜더', oee: 90.5 },
+      { machine: '대형 프레스 라인', group: '대형프레스(TR)', status: 'RUN', plan: 2000, actual: 1980, model: 'SG2 리어 플로어', oee: 93.0 },
+      { machine: '대형 800톤 1호기', group: '대형프레스(PR)', status: 'RUN', plan: 2600, actual: 2510, model: 'JX1 언더바디 멤버', oee: 89.2 },
+      { machine: '대형 400톤 1호기', group: '대형프레스(PR)', status: 'RUN', plan: 2200, actual: 2150, model: 'MV 도어 임팩트 빔', oee: 92.4 },
+      { machine: '200T', group: '소형프레스', status: 'RUN', plan: 4500, actual: 4480, model: '브라켓 A/B/C', oee: 96.0 },
+      { machine: '250T-1', group: '소형프레스', status: 'WAIT', plan: 4000, actual: 3100, model: '시트 프레임 링크 (자재대기)', oee: 74.0 },
+      { machine: '250T-2', group: '소형프레스', status: 'RUN', plan: 4000, actual: 3950, model: '힌지 어셈블리', oee: 93.5 },
+      { machine: '250T-3', group: '소형프레스', status: 'RUN', plan: 3800, actual: 3720, model: '스트라이커 서포트', oee: 91.0 },
+      { machine: '자동화 650톤 트렌스퍼', group: '자동화 프레스', status: 'RUN', plan: 2800, actual: 2750, model: '필러 어셈블리', oee: 95.0 }
+    ];
+
+    let prodLineChartInstance = null;
+    let prodStatusDonutInstance = null;
+
+    function initProductionCharts() {
+      const lineCtx = document.getElementById('prodLineChart').getContext('2d');
+      prodLineChartInstance = new Chart(lineCtx, {
+        type: 'bar',
+        data: {
+          labels: ['대형(TR)', '대형(PR)', '소형라인', '자동화라인'],
+          datasets: [
+            {
+              label: '계획 수량',
+              data: [23200, 4800, 16300, 2800],
+              backgroundColor: 'rgba(148, 163, 184, 0.65)',
+              borderRadius: 6
+            },
+            {
+              label: '실적 수량',
+              data: [21270, 4660, 15250, 2750],
+              backgroundColor: 'rgba(37, 99, 235, 0.85)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { family: 'Noto Sans KR', size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { title: { display: true, text: '수량(EA)', font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+
+      const donutCtx = document.getElementById('prodStatusDonutChart').getContext('2d');
+      prodStatusDonutInstance = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['가동중 (13대)', '정지/보수 (1대)', '대기 (1대)'],
+          datasets: [{
+            data: [13, 1, 1],
+            backgroundColor: ['#10b981', '#f43f5e', '#f59e0b'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Noto Sans KR', size: 11 } } }
+          }
+        }
+      });
+    }
+
+    function renderProductionTable() {
+      const tbody = document.getElementById('productionTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = PRODUCTION_MOCK_DATA.map(item => {
+        const rate = ((item.actual / item.plan) * 100).toFixed(1);
+        let statusBadge = '';
+        if (item.status === 'RUN') {
+          statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>가동중</span>';
+        } else if (item.status === 'STOP') {
+          statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800"><span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span>정지(수리)</span>';
+        } else {
+          statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800"><span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>대기</span>';
+        }
+
+        return `<tr class="hover:bg-slate-50 transition-colors">
+          <td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">${item.machine}</td>
+          <td class="py-2.5 px-3 text-center"><span class="px-2 py-0.5 rounded text-[11px] bg-slate-100 font-semibold">${item.group}</span></td>
+          <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-medium">${item.plan.toLocaleString()}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-blue-700">${item.actual.toLocaleString()}</td>
+          <td class="py-2.5 px-3 text-center font-bold ${Number(rate) >= 90 ? 'text-emerald-700' : 'text-amber-700'}">${rate}%</td>
+          <td class="py-2.5 px-3 text-center font-mono font-semibold">${item.oee}%</td>
+          <td class="py-2.5 px-3 text-slate-600 truncate max-w-xs">${item.model}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function refreshProductionData() {
+      showToast('생산 및 가동 현황 데이터를 갱신했습니다.', 'success');
+    }
+
+    // ----------------------------------------------------
+    // 공통 토스트 함수
+    // ----------------------------------------------------
     function showToast(msg, type = 'info') {
       const toast = document.getElementById('toast');
       document.getElementById('toastMessage').innerText = msg;
@@ -1388,15 +1844,18 @@
       setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
     }
 
+    // ----------------------------------------------------
+    // 페이지 초기 로딩
+    // ----------------------------------------------------
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
 
       // 세션 인증 체크
       if (sessionStorage.getItem('_db_access_auth_') === 'granted') {
         document.getElementById('securityLockModal').classList.add('hidden');
-        document.getElementById('mainDashboardApp').classList.remove('blur-sm', 'pointer-events-none');
       }
 
+      // 데이터 로드
       try {
         const saved = localStorage.getItem('weekly_machine_defect_records_v7');
         if (saved) {
@@ -1410,15 +1869,20 @@
         initDefaultData();
       }
 
+      // 차트 및 화면 초기화
       initDefectCharts();
+      initProductionCharts();
+      renderProductionTable();
       populatePeriodSelectors();
       updateDefectDashboard();
 
+      // 검색창 이벤트
       document.getElementById('searchInput').addEventListener('input', (e) => {
         searchQuery = e.target.value;
         updateDefectDashboard();
       });
 
+      // 엑셀 파일 로드 이벤트
       document.getElementById('excelFileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
