@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>설비별 주간·월간 불량 집계 및 손실 분석 대시보드</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS (Excel Parser & Exporter) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- PptxGenJS (PowerPoint Presentation Generator) -->
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+
+  <!-- Google Fonts: Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans KR"', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background-color: #f8fafc;
+      color: #1e293b;
+      font-family: 'Noto Sans KR', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .badge-pulse {
+      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    @media print {
+      header,
+      #fileDropBanner,
+      #filterToolbarSection,
+      .no-print,
+      .action-column {
+        display: none !important;
+      }
+      body {
+        background-color: #ffffff !important;
+        font-size: 10pt;
+      }
+      main {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .shadow-sm, .shadow-md, .shadow-xl {
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-rose-100 selection:text-rose-800" oncontextmenu="return false;">
+
+  <!-- 대시보드 접근 암호화 보안 잠금 모달 -->
+  <div id="securityLockModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden p-6 text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+        <i data-lucide="shield-lock" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-800 tracking-tight">시스템 접근 보안 인증</h3>
+        <p class="text-xs text-slate-500 mt-1">대시보드를 열람하려면 비밀번호를 입력하세요.</p>
+      </div>
+      <form onsubmit="verifyDashboardAccess(event)" class="space-y-3">
+        <input 
+          type="password" 
+          id="systemPasswordInput" 
+          placeholder="비밀번호 입력..." 
+          class="w-full px-3 py-2 text-center text-sm font-semibold rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:outline-none tracking-widest"
+          autofocus 
+        />
+        <button 
+          type="submit" 
+          class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-200"
+        >
+          인증 확인 및 접속
+        </button>
+      </form>
+      <div id="securityErrorMsg" class="text-xs text-rose-600 font-semibold hidden">비밀번호가 올바르지 않습니다.</div>
+    </div>
+  </div>
+
+  <div id="mainDashboardApp" class="flex-1 flex flex-col blur-sm pointer-events-none transition-all duration-300">
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center text-white shadow-md shadow-rose-200">
+            <i data-lucide="cpu" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">설비별 주간·월간 불량 집계 대시보드</h1>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">보안 강화 v7</span>
+            </div>
+            <p class="text-xs text-slate-500 hidden sm:block">설비별 3개 주차 연속 정렬 및 고시인성 비교 대시보드</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <input type="file" id="excelFileInput" accept=".xls, .xlsx, .csv" class="hidden" />
+
+          <button onclick="document.getElementById('excelFileInput').click()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 transition-colors shadow-sm" title="엑셀 파일 불러오기">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">엑셀 파일 열기</span>
+            <span class="sm:hidden">엑셀</span>
+          </button>
+
+          <button onclick="openPasteModal()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-sm" title="엑셀 표 복사하여 바로 붙여넣기">
+            <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+            <span class="hidden md:inline">Ctrl+V 붙여넣기</span>
+            <span class="md:hidden">붙여넣기</span>
+          </button>
+
+          <button onclick="window.print()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors shadow-sm">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span class="hidden lg:inline">PDF / 인쇄</span>
+          </button>
+
+          <button onclick="exportToExcel()" class="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">누적 엑셀</span>
+            <span class="sm:hidden">다운</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- Filter and Toolbar Section -->
+      <div id="filterToolbarSection" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-rose-600"></i>
+              집계 주기
+            </span>
+            <div class="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+              <button onclick="setPeriodMode('weekly')" id="tabWeekly" class="px-3 py-1.5 rounded-lg transition-all bg-white text-rose-700 shadow-sm font-bold">
+                주간별 (Weekly)
+              </button>
+              <button onclick="setPeriodMode('monthly')" id="tabMonthly" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+                월간별 (Monthly)
+              </button>
+              <button onclick="setPeriodMode('all')" id="tabAll" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+                전체 누적
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-slate-400 font-medium">상세 구간(최신순):</span>
+            <select id="periodSubFilter" onchange="handlePeriodFilterChange()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-rose-500 focus:outline-none">
+              <option value="ALL">전체 구간</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="설비명 검색 (예: 500톤 1호기)..."
+              class="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 focus:bg-white transition-colors"
+            />
+          </div>
+
+          <select id="lineGroupFilter" onchange="applyFilters()" class="py-2 px-3 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-700 focus:ring-2 focus:ring-rose-500 focus:outline-none font-semibold">
+            <option value="ALL">전체 라인 구분 (3대 대분류)</option>
+            <option value="대형프레스(TR)">대형프레스 (TR)</option>
+            <option value="대형프레스(PR)">대형프레스 (PR)</option>
+            <option value="소형프레스">소형프레스 (200T~250-3)</option>
+            <option value="자동화 프레스">자동화 프레스 (로봇/셔틀/650T)</option>
+          </select>
+
+          <select id="defectTypeFilter" onchange="applyFilters()" class="py-2 px-3 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-700 focus:ring-2 focus:ring-rose-500 focus:outline-none">
+            <option value="ALL">전체 불량 유형</option>
+          </select>
+
+          <div class="flex items-center gap-2">
+            <button onclick="resetAllFilters()" title="필터 초기화" class="flex-1 py-2 px-3 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              <span>필터 초기화</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Line Quick Navigation Pills -->
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 overflow-x-auto">
+          <div class="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
+            <span class="font-bold text-slate-700">라인별 바로가기:</span>
+          </div>
+          <div id="quickLinePills" class="flex items-center gap-1.5 overflow-x-auto scrollbar-thin py-0.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:border-rose-300 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">총 불량 수량</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <i data-lucide="alert-octagon" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <span id="kpiDefectQty" class="text-2xl sm:text-3xl font-bold text-slate-800">0</span>
+            <span class="text-xs font-semibold text-rose-600">EA</span>
+          </div>
+          <div class="mt-2 flex items-center text-xs text-slate-500">
+            <span id="kpiPeriodLabel" class="text-rose-600 font-semibold">선택 기간 집계</span>
+            <span class="mx-1.5 text-slate-300">•</span>
+            <span id="kpiMachineCount" class="font-medium text-slate-700">0대 설비 가동</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-300 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">총 불량 손실액</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-lg font-medium text-amber-600">₩</span>
+            <span id="kpiDefectVal" class="text-2xl sm:text-3xl font-bold text-slate-800">0</span>
+          </div>
+          <div class="mt-2 flex items-center text-xs text-slate-500">
+            <span>평균 단가: </span>
+            <span id="kpiAvgPrice" class="font-semibold text-amber-700 ml-1">₩0</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:border-red-300 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-rose-600 flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-rose-500 badge-pulse"></span>
+              최다 불량 발생 설비 (1위)
+            </span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <i data-lucide="flame" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 truncate">
+            <span id="kpiTopMachine" class="text-base sm:text-lg font-bold text-slate-800 block truncate">-</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <span id="kpiTopMachineStats" class="font-semibold text-rose-700">0개 (₩0)</span>
+            <span class="text-slate-400">우선 점검 필요</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-indigo-600 flex items-center gap-1">
+              <i data-lucide="pie-chart" class="w-4 h-4"></i>
+              최다 발생 불량유형
+            </span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-2 truncate">
+            <span id="kpiTopDefectType" class="text-base sm:text-lg font-bold text-slate-800 block truncate">-</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <span id="kpiTopDefectShare" class="font-semibold text-indigo-700">0개 (0%)</span>
+            <span class="text-slate-400">집중 대책 수립</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Section (주차별 추이 & 라인/설비별 비교) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4 text-rose-600"></i>
+                <span>주차별 불량 추이</span>
+                <span id="activeLineBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">전체 라인</span>
+              </h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">막대 중심: 수량(EA) / 막대 최상단: 손실액(만원)</p>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]">
+              <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold">막대: 수량</span>
+              <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">선: 손실액</span>
+            </div>
+          </div>
+          <div class="relative w-full h-[280px]">
+            <canvas id="trendTimelineChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                <i data-lucide="layout-grid" class="w-4 h-4 text-indigo-600"></i>
+                <span id="lineComparisonTitle">라인별 불량 수량 및 손실액</span>
+                <span id="lineComparisonBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">4대 라인 비교</span>
+              </h3>
+              <p id="lineComparisonDesc" class="text-[11px] text-slate-400 mt-0.5">TR · PR · 소형 · 자동화 라인별 불량 집중도 파악</p>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]">
+              <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">막대: 수량</span>
+              <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">선: 손실액</span>
+            </div>
+          </div>
+          <div class="relative w-full h-[280px]">
+            <canvas id="lineComparisonChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/70">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="table-properties" class="w-5 h-5 text-rose-600"></i>
+              <h2 class="font-bold text-slate-800 text-base" id="matrixTableTitle">설비별 주차 집계 내역</h2>
+              <span id="tableRecordCountBadge" class="text-xs font-semibold px-2.5 py-0.5 bg-rose-100 text-rose-800 rounded-full">0건</span>
+            </div>
+
+            <div class="inline-flex p-1 bg-white border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs">
+              <button onclick="setTableViewMode('pivot')" id="btnViewPivot" class="px-3 py-1 rounded-lg transition-all bg-rose-600 text-white shadow-xs font-bold flex items-center gap-1.5">
+                <i data-lucide="columns-3" class="w-3.5 h-3.5"></i>
+                <span>기간별 가로 비교 뷰 (최신순)</span>
+              </button>
+              <button onclick="setTableViewMode('detailed')" id="btnViewDetailed" class="px-3 py-1 rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span>설비별 3개주차 불량 심층 비교표</span>
+              </button>
+            </div>
+
+            <label id="groupByLineToggleWrapper" class="flex items-center gap-2 px-3 py-1.5 bg-white border border-rose-300 rounded-xl cursor-pointer hover:bg-rose-50 transition-colors shadow-2xs">
+              <input type="checkbox" id="groupByLineCheckbox" onchange="toggleGroupByLine()" class="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer">
+              <span class="text-xs font-bold text-rose-800 select-none flex items-center gap-1">
+                <i data-lucide="combine" class="w-3.5 h-3.5 text-rose-600"></i>
+                라인구분 그룹별 합산 요약보기
+              </span>
+            </label>
+          </div>
+
+          <div id="quickWeekFilterTabs" class="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Pivot Matrix View -->
+        <div id="pivotViewContainer" class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr id="pivotTableHeaderRow" class="border-b border-slate-200 bg-sky-900 text-white font-semibold text-center select-none">
+                <!-- Dynamically built -->
+              </tr>
+            </thead>
+            <tbody id="pivotTableBody" class="divide-y divide-slate-200 text-slate-700">
+              <!-- Populated -->
+            </tbody>
+            <tfoot id="pivotTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+              <!-- Populated -->
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Detailed 3-Week Grouped Table View (정렬 및 너비 개선) -->
+        <div id="detailedViewContainer" class="overflow-x-auto hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 bg-sky-900 text-white font-semibold text-center select-none">
+                <th class="py-3 px-3 w-36 min-w-[140px] text-left bg-sky-950">설비명</th>
+                <th class="py-3 px-2 w-28 min-w-[100px] text-center">라인구분</th>
+                <th class="py-3 px-2 w-20 min-w-[75px] text-center bg-rose-700">집계구간</th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">소재불량<br><span class="text-[10px] font-normal">(녹)</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">셋업품</th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">치수확보<br><span class="text-[10px] font-normal">불량품</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">BURR<br><span class="text-[10px] font-normal">(HOLE)</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">찍힘</th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">스크래치<br><span class="text-[10px] font-normal">(긁힘)</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">치수불량<br><span class="text-[10px] font-normal">(게이지)</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">형상불량<br><span class="text-[10px] font-normal">(타각NG)</span></th>
+                <th class="py-3 px-2 bg-amber-300 text-slate-900">마킹불량<br><span class="text-[10px] font-normal">(홀누락)</span></th>
+                <th class="py-3 px-2.5 bg-amber-400 text-rose-900 font-extrabold min-w-[80px]">합계 (EA)</th>
+                <th class="py-3 px-3 bg-amber-400 text-rose-900 font-extrabold text-right min-w-[100px]">불량금액 (원)</th>
+              </tr>
+            </thead>
+            <tbody id="matrixTableBody" class="divide-y divide-slate-200 text-slate-700">
+              <!-- Populated -->
+            </tbody>
+            <tfoot id="matrixTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+              <!-- Populated -->
+            </tfoot>
+          </table>
+        </div>
+
+        <div id="tableEmptyState" class="hidden py-16 text-center">
+          <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-3">
+            <i data-lucide="inbox" class="w-6 h-6"></i>
+          </div>
+          <p class="text-sm font-medium text-slate-600">선택한 조건의 불량 데이터가 없습니다.</p>
+          <p class="text-xs text-slate-400 mt-1">기간 또는 라인 필터를 변경해 보세요.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="pasteModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i data-lucide="clipboard-paste" class="w-5 h-5 text-indigo-600"></i>
+          주차/월별 엑셀 표 복사/붙여넣기
+        </h3>
+        <button type="button" onclick="closePasteModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-3 text-xs sm:text-sm">
+        <p class="text-slate-600 leading-relaxed">
+          엑셀에서 표 전체를 복사하여 아래 상자에 붙여넣으시면 자동으로 분석 반영됩니다.
+        </p>
+        <textarea
+          id="pasteTextArea"
+          rows="9"
+          placeholder="여기에 엑셀 표를 그대로 붙여넣으세요..."
+          class="w-full p-3 font-mono text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:outline-none bg-slate-50"
+        ></textarea>
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-xs text-slate-400">동일 주차/월은 중복 합산되지 않고 스마트 갱신됩니다.</span>
+          <div class="flex gap-2">
+            <button type="button" onclick="closePasteModal()" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">취소</button>
+            <button type="button" onclick="processPastedDefectText()" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors shadow-sm">대시보드 반영</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 text-white text-xs sm:text-sm shadow-xl border border-slate-800">
+    <div id="toastIcon"></div>
+    <span id="toastMessage">알림</span>
+  </div>
+
+  <script>
+    // ==========================================
+    // 0. 보안 및 무단 복사/수정 방지 스크립트
+    // ==========================================
+    const DASHBOARD_PASS = '5555'; // 접속 비밀번호 (필요시 변경)
+
+    function verifyDashboardAccess(e) {
+      e.preventDefault();
+      const input = document.getElementById('systemPasswordInput').value;
+      const errorMsg = document.getElementById('securityErrorMsg');
+      if (input === DASHBOARD_PASS) {
+        document.getElementById('securityLockModal').classList.add('hidden');
+        const mainApp = document.getElementById('mainDashboardApp');
+        mainApp.classList.remove('blur-sm', 'pointer-events-none');
+        sessionStorage.setItem('_db_access_auth_', 'granted');
+        showToast('접근 인증 완료', 'success');
+      } else {
+        errorMsg.classList.remove('hidden');
+        document.getElementById('systemPasswordInput').value = '';
+      }
+    }
+
+    // 개발자 도구 및 소스 보기 키 조합 방지
+    window.addEventListener('keydown', function (e) {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C' || e.key === 'J')) ||
+        (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S'))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast('보안 설정에 의해 소스보기가 제한됩니다.', 'error');
+        return false;
+      }
+    });
+
+    const DEFECT_KEYS = [
+      { key: 'mat', label: '소재불량(녹)' },
+      { key: 'setup', label: '셋업품' },
+      { key: 'dimSec', label: '치수확보불량품' },
+      { key: 'burr', label: 'BURR(HOLE)' },
+      { key: 'dent', label: '찍힘' },
+      { key: 'scratch', label: '스크래치(긁힘)' },
+      { key: 'dimGauge', label: '치수불량(게이지)' },
+      { key: 'shape', label: '형상불량(타각NG)' },
+      { key: 'marking', label: '마킹불량(홀누락)' }
+    ];
+
+    const STANDARD_MACHINES = [
+      // 1. 대형프레스 (TR)
+      { name: '대형 500톤 1호기', group: '대형프레스(TR)' },
+      { name: '대형 500톤 2호기', group: '대형프레스(TR)' },
+      { name: '대형 500톤 3호기', group: '대형프레스(TR)' },
+      { name: '대형 600톤 1호기', group: '대형프레스(TR)' },
+      { name: '대형 600톤 2호기', group: '대형프레스(TR)' },
+      { name: '대형 600톤 3호기', group: '대형프레스(TR)' },
+      { name: '대형 800톤 2호기', group: '대형프레스(TR)' },
+      { name: '대형 프레스 라인', group: '대형프레스(TR)' },
+
+      // 2. 대형프레스 (PR)
+      { name: '대형 800톤 1호기', group: '대형프레스(PR)' },
+      { name: '대형 400톤 1호기', group: '대형프레스(PR)' },
+
+      // 3. 소형프레스 (200T~250-3)
+      { name: '200T', group: '소형프레스' },
+      { name: '250T-1', group: '소형프레스' },
+      { name: '250T-2', group: '소형프레스' },
+      { name: '250T-3', group: '소형프레스' },
+
+      // 4. 자동화 프레스 (로봇/셔틀/650T)
+      { name: '로봇2라인 (250톤)', group: '자동화 프레스' },
+      { name: '셔틀 400톤', group: '자동화 프레스' },
+      { name: '650톤 트렌스퍼 1호기', group: '자동화 프레스' }
+    ];
+
+    const ORDERED_GROUPS = ['대형프레스(TR)', '대형프레스(PR)', '소형프레스', '자동화 프레스'];
+
+    let weeklyDefectRecords = [];
+
+    function initDefaultData() {
+      const raw37 = [
+        { machine: '대형 500톤 1호기', defects: { mat: 37, setup: 0, dimSec: 1954, burr: 0, dent: 248, scratch: 84, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 2323, lossAmount: 1268358 },
+        { machine: '대형 500톤 2호기', defects: { mat: 0, setup: 38, dimSec: 76, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 114, lossAmount: 56829 },
+        { machine: '대형 600톤 1호기', defects: { mat: 0, setup: 34, dimSec: 20, burr: 0, dent: 30, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 84, lossAmount: 34020 },
+        { machine: '대형 600톤 2호기', defects: { mat: 62, setup: 50, dimSec: 200, burr: 153, dent: 61, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 526, lossAmount: 277465 },
+        { machine: '대형 600톤 3호기', defects: { mat: 0, setup: 0, dimSec: 204, burr: 0, dent: 1011, scratch: 40, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 1255, lossAmount: 798180 },
+        { machine: '대형 800톤 1호기', defects: { mat: 8, setup: 166, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 174, lossAmount: 53737 },
+        { machine: '대형 400톤 1호기', defects: { mat: 236, setup: 135, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 371, lossAmount: 217406 },
+        { machine: '200T', defects: { mat: 0, setup: 842, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 842, lossAmount: 168400 },
+        { machine: '250T-1', defects: { mat: 118, setup: 804, dimSec: 150, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 1072, lossAmount: 214400 },
+        { machine: '250T-2', defects: { mat: 18, setup: 378, dimSec: 150, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 546, lossAmount: 109200 },
+        { machine: '로봇2라인 (250톤)', defects: { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 3, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 3, lossAmount: 4800 },
+        { machine: '셔틀 400톤', defects: { mat: 2, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 2, lossAmount: 3122 },
+        { machine: '650톤 트렌스퍼 1호기', defects: { mat: 13, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 13, lossAmount: 62173 }
+      ];
+
+      const raw36 = [
+        { machine: '대형 500톤 1호기', defects: { mat: 64, setup: 0, dimSec: 974, burr: 16, dent: 0, scratch: 157, dimGauge: 542, shape: 0, marking: 0 }, totalQty: 1753, lossAmount: 957138 },
+        { machine: '대형 500톤 2호기', defects: { mat: 37, setup: 0, dimSec: 42, burr: 0, dent: 0, scratch: 21, dimGauge: 89, shape: 0, marking: 0 }, totalQty: 189, lossAmount: 94217 },
+        { machine: '대형 600톤 1호기', defects: { mat: 0, setup: 0, dimSec: 261, burr: 0, dent: 0, scratch: 14, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 275, lossAmount: 111375 },
+        { machine: '대형 600톤 2호기', defects: { mat: 0, setup: 37, dimSec: 388, burr: 203, dent: 17, scratch: 138, dimGauge: 0, shape: 90, marking: 0 }, totalQty: 873, lossAmount: 460508 },
+        { machine: '대형 600톤 3호기', defects: { mat: 0, setup: 10, dimSec: 114, burr: 30, dent: 471, scratch: 56, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 681, lossAmount: 433116 },
+        { machine: '대형 800톤 1호기', defects: { mat: 0, setup: 60, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 60, lossAmount: 18530 },
+        { machine: '대형 400톤 1호기', defects: { mat: 254, setup: 135, dimSec: 48, burr: 0, dent: 0, scratch: 7, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 444, lossAmount: 260184 },
+        { machine: '200T', defects: { mat: 40, setup: 796, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 836, lossAmount: 167200 },
+        { machine: '250T-1', defects: { mat: 0, setup: 404, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 404, lossAmount: 80800 },
+        { machine: '250T-2', defects: { mat: 0, setup: 242, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 242, lossAmount: 48400 },
+        { machine: '로봇2라인 (250톤)', defects: { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 5, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 5, lossAmount: 7800 },
+        { machine: '셔틀 400톤', defects: { mat: 1, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 5, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 6, lossAmount: 9365 },
+        { machine: '650톤 트렌스퍼 1호기', defects: { mat: 24, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 24, lossAmount: 114780 }
+      ];
+
+      const raw35 = [
+        { machine: '대형 500톤 1호기', defects: { mat: 12, setup: 10, dimSec: 500, burr: 5, dent: 10, scratch: 20, dimGauge: 100, shape: 0, marking: 0 }, totalQty: 657, lossAmount: 320000 },
+        { machine: '대형 500톤 2호기', defects: { mat: 5, setup: 2, dimSec: 10, burr: 0, dent: 0, scratch: 4, dimGauge: 15, shape: 0, marking: 0 }, totalQty: 36, lossAmount: 18000 },
+        { machine: '대형 600톤 1호기', defects: { mat: 0, setup: 12, dimSec: 80, burr: 0, dent: 10, scratch: 5, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 107, lossAmount: 45000 },
+        { machine: '200T', defects: { mat: 10, setup: 300, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 310, lossAmount: 62000 }
+      ];
+
+      function buildRecords(rawList, weekCode, weekLabel, type) {
+        return rawList.map(item => {
+          const mMeta = STANDARD_MACHINES.find(m => m.name === item.machine) || { group: '대형프레스(TR)' };
+          const sumQty = item.totalQty;
+          const lossAmt = item.lossAmount;
+          const unitP = sumQty > 0 ? Math.round(lossAmt / sumQty) : 500;
+          return {
+            week: weekCode,
+            weekLabel: weekLabel,
+            type: type,
+            year: '2026',
+            group: mMeta.group,
+            machine: item.machine,
+            defects: item.defects,
+            totalQty: sumQty,
+            lossAmount: lossAmt,
+            unitPrice: unitP
+          };
+        });
+      }
+
+      weeklyDefectRecords = [
+        ...buildRecords(raw37, '2026-W37', '37주차', 'weekly'),
+        ...buildRecords(raw36, '2026-W36', '36주차', 'weekly'),
+        ...buildRecords(raw35, '2026-W35', '35주차', 'weekly')
+      ];
+    }
+
+    let periodMode = 'weekly';
+    let selectedSubPeriod = 'ALL';
+    let selectedLineGroup = 'ALL';
+    let selectedDefectType = 'ALL';
+    let searchQuery = '';
+    let currentTableViewMode = 'pivot';
+    let isGroupByLineChecked = false;
+
+    let trendChartInstance = null;
+    let lineChartInstance = null;
+
+    const highVisibilityDualLabelPlugin = {
+      id: 'highVisibilityDualLabelPlugin',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (meta.hidden) return;
+          meta.data.forEach((element, index) => {
+            const val = dataset.data[index];
+            if (val === undefined || val === null || val === 0) return;
+
+            ctx.save();
+            ctx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (dataset.type === 'bar') {
+              const text = `${Number(val).toLocaleString()}개`;
+              const textWidth = ctx.measureText(text).width;
+              const barHeight = Math.abs(element.base - element.y);
+              const centerY = element.y + (barHeight / 2);
+
+              if (barHeight >= 24) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+                ctx.beginPath();
+                ctx.roundRect(element.x - (textWidth / 2) - 6, centerY - 10, textWidth + 12, 20, 6);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(text, element.x, centerY);
+              } else {
+                ctx.fillStyle = '#be123c';
+                ctx.fillText(text, element.x, element.y - 12);
+              }
+
+            } else if (dataset.type === 'line') {
+              const text = `${Math.round(val).toLocaleString()}만`;
+              const textWidth = ctx.measureText(text).width;
+              const pointY = element.y - 15;
+
+              ctx.fillStyle = '#fef3c7';
+              ctx.strokeStyle = '#d97706';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.roundRect(element.x - (textWidth / 2) - 5, pointY - 9, textWidth + 10, 18, 4);
+              ctx.fill();
+              ctx.stroke();
+
+              ctx.fillStyle = '#92400e';
+              ctx.fillText(text, element.x, pointY);
+            }
+
+            ctx.restore();
+          });
+        });
+      }
+    };
+
+    function initDefectCharts() {
+      const trendCtx = document.getElementById('trendTimelineChart').getContext('2d');
+      trendChartInstance = new Chart(trendCtx, {
+        type: 'bar',
+        plugins: [highVisibilityDualLabelPlugin],
+        data: {
+          labels: [],
+          datasets: [
+            {
+              type: 'bar',
+              label: '불량 수량 (EA)',
+              data: [],
+              backgroundColor: 'rgba(244, 63, 94, 0.85)',
+              borderRadius: 6,
+              yAxisID: 'yQty',
+              order: 2
+            },
+            {
+              type: 'line',
+              label: '불량 손실액 (만원)',
+              data: [],
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              borderWidth: 2.5,
+              pointBackgroundColor: '#ffffff',
+              pointBorderColor: '#d97706',
+              pointRadius: 5,
+              yAxisID: 'yLoss',
+              order: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 35 } },
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { family: 'Noto Sans KR', size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: 'Noto Sans KR', size: 11 } } },
+            yQty: { type: 'linear', position: 'left', grace: '20%', title: { display: true, text: '불량수량 (EA)', font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+            yLoss: { type: 'linear', position: 'right', grace: '28%', title: { display: true, text: '손실액 (만원)', font: { size: 10 } }, grid: { display: false } }
+          }
+        }
+      });
+
+      const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
+      lineChartInstance = new Chart(lineCtx, {
+        type: 'bar',
+        plugins: [highVisibilityDualLabelPlugin],
+        data: {
+          labels: [],
+          datasets: [
+            {
+              type: 'bar',
+              label: '불량 수량 (EA)',
+              data: [],
+              backgroundColor: 'rgba(99, 102, 241, 0.85)',
+              borderRadius: 6,
+              yAxisID: 'yQty',
+              order: 2
+            },
+            {
+              type: 'line',
+              label: '불량 손실액 (만원)',
+              data: [],
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              borderWidth: 2.5,
+              pointBackgroundColor: '#ffffff',
+              pointBorderColor: '#d97706',
+              pointRadius: 5,
+              yAxisID: 'yLoss',
+              order: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 35 } },
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { family: 'Noto Sans KR', size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: 'Noto Sans KR', size: 10 }, autoSkip: false, maxRotation: 25, minRotation: 0 } },
+            yQty: { type: 'linear', position: 'left', grace: '20%', title: { display: true, text: '불량수량 (EA)', font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+            yLoss: { type: 'linear', position: 'right', grace: '28%', title: { display: true, text: '손실액 (만원)', font: { size: 10 } }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function setPeriodMode(mode) {
+      periodMode = mode;
+      selectedSubPeriod = 'ALL';
+      ['weekly', 'monthly', 'all'].forEach(m => {
+        const btn = document.getElementById(`tab${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        if (!btn) return;
+        if (m === mode) {
+          btn.className = 'px-3 py-1.5 rounded-lg transition-all bg-white text-rose-700 shadow-sm font-bold';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900';
+        }
+      });
+      populatePeriodSelectors();
+      updateDefectDashboard();
+    }
+
+    function populatePeriodSelectors() {
+      const subSet = new Set();
+      weeklyDefectRecords.forEach(item => {
+        if (periodMode === 'weekly' && item.type === 'weekly' && item.week) subSet.add(item.week);
+        if (periodMode === 'monthly' && item.type === 'monthly' && item.week) subSet.add(item.week);
+        if (periodMode === 'all' && item.week) subSet.add(item.week);
+      });
+
+      const subSelect = document.getElementById('periodSubFilter');
+      const subsDesc = Array.from(subSet).sort().reverse();
+      subSelect.innerHTML = `<option value="ALL">전체 구간 (최신순)</option>` +
+        subsDesc.map(w => {
+          const sample = weeklyDefectRecords.find(r => r.week === w);
+          const lbl = sample ? sample.weekLabel : w;
+          return `<option value="${w}" ${selectedSubPeriod === w ? 'selected' : ''}>${lbl}</option>`;
+        }).join('');
+
+      renderQuickWeekFilterTabs();
+    }
+
+    function renderQuickWeekFilterTabs() {
+      const tabsContainer = document.getElementById('quickWeekFilterTabs');
+      if (!tabsContainer) return;
+      const subSet = new Set();
+      weeklyDefectRecords.forEach(i => {
+        if (periodMode === 'weekly' && i.type === 'weekly') subSet.add(i.week);
+        else if (periodMode === 'monthly' && i.type === 'monthly') subSet.add(i.week);
+        else if (periodMode === 'all') subSet.add(i.week);
+      });
+      const sortedDesc = Array.from(subSet).sort().reverse();
+
+      let html = `<button onclick="selectQuickWeekTab('ALL')" class="px-3 py-1.5 rounded-xl transition-all font-bold ${selectedSubPeriod === 'ALL' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">전체 보기</button>`;
+      sortedDesc.forEach(w => {
+        const sample = weeklyDefectRecords.find(r => r.week === w);
+        const lbl = sample ? sample.weekLabel : w;
+        html += `<button onclick="selectQuickWeekTab('${w}')" class="px-3 py-1.5 rounded-xl transition-all font-bold shrink-0 ${selectedSubPeriod === w ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${lbl}</button>`;
+      });
+      tabsContainer.innerHTML = html;
+    }
+
+    function selectQuickWeekTab(weekVal) {
+      selectedSubPeriod = weekVal;
+      const subEl = document.getElementById('periodSubFilter');
+      if (subEl) subEl.value = weekVal;
+      updateDefectDashboard();
+    }
+
+    function handlePeriodFilterChange() {
+      selectedSubPeriod = document.getElementById('periodSubFilter').value;
+      updateDefectDashboard();
+    }
+
+    function populateDropdownFilters() {
+      const dSelect = document.getElementById('defectTypeFilter');
+      dSelect.innerHTML = `<option value="ALL">전체 불량유형 (9대 유형)</option>` +
+        DEFECT_KEYS.map(d => `<option value="${d.key}" ${selectedDefectType === d.key ? 'selected' : ''}>${d.label}</option>`).join('');
+
+      const pillsContainer = document.getElementById('quickLinePills');
+      pillsContainer.innerHTML = '';
+      
+      const allPill = document.createElement('button');
+      allPill.className = `px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ${selectedLineGroup === 'ALL' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+      allPill.innerText = `전체 라인`;
+      allPill.onclick = () => { selectedLineGroup = 'ALL'; document.getElementById('lineGroupFilter').value = 'ALL'; applyFilters(); };
+      pillsContainer.appendChild(allPill);
+
+      ORDERED_GROUPS.forEach(grp => {
+        const pill = document.createElement('button');
+        const isActive = selectedLineGroup === grp;
+        pill.className = `px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ${isActive ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+        pill.innerText = grp;
+        pill.onclick = () => { 
+          selectedLineGroup = isActive ? 'ALL' : grp; 
+          document.getElementById('lineGroupFilter').value = selectedLineGroup; 
+          applyFilters(); 
+        };
+        pillsContainer.appendChild(pill);
+      });
+    }
+
+    function applyFilters() {
+      selectedLineGroup = document.getElementById('lineGroupFilter').value;
+      selectedDefectType = document.getElementById('defectTypeFilter').value;
+      updateDefectDashboard();
+    }
+
+    function resetAllFilters() {
+      selectedLineGroup = 'ALL';
+      selectedDefectType = 'ALL';
+      selectedSubPeriod = 'ALL';
+      searchQuery = '';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('lineGroupFilter').value = 'ALL';
+      document.getElementById('defectTypeFilter').value = 'ALL';
+      document.getElementById('periodSubFilter').value = 'ALL';
+      updateDefectDashboard();
+      showToast('필터가 초기화되었습니다.', 'info');
+    }
+
+    function toggleGroupByLine() {
+      isGroupByLineChecked = document.getElementById('groupByLineCheckbox').checked;
+      renderPivotMatrixTable(getFilteredData());
+    }
+
+    function setTableViewMode(mode) {
+      currentTableViewMode = mode;
+      const btnPivot = document.getElementById('btnViewPivot');
+      const btnDetailed = document.getElementById('btnViewDetailed');
+      const pivotContainer = document.getElementById('pivotViewContainer');
+      const detailedContainer = document.getElementById('detailedViewContainer');
+      const toggleWrap = document.getElementById('groupByLineToggleWrapper');
+
+      if (mode === 'pivot') {
+        btnPivot.className = 'px-3 py-1 rounded-lg transition-all bg-rose-600 text-white font-bold flex items-center gap-1.5';
+        btnDetailed.className = 'px-3 py-1 rounded-lg transition-all text-slate-600 flex items-center gap-1.5';
+        pivotContainer.classList.remove('hidden');
+        detailedContainer.classList.add('hidden');
+        toggleWrap.classList.remove('hidden');
+      } else {
+        btnDetailed.className = 'px-3 py-1 rounded-lg transition-all bg-rose-600 text-white font-bold flex items-center gap-1.5';
+        btnPivot.className = 'px-3 py-1 rounded-lg transition-all text-slate-600 flex items-center gap-1.5';
+        detailedContainer.classList.remove('hidden');
+        pivotContainer.classList.add('hidden');
+        toggleWrap.classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    function getFilteredData() {
+      return weeklyDefectRecords.filter(item => {
+        if (periodMode === 'weekly' && item.type !== 'weekly') return false;
+        if (periodMode === 'monthly' && item.type !== 'monthly') return false;
+        if (selectedSubPeriod !== 'ALL' && item.week !== selectedSubPeriod) return false;
+        if (selectedLineGroup !== 'ALL' && item.group !== selectedLineGroup) return false;
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          if (!item.machine.toLowerCase().includes(q) && !item.group.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function updateDefectDashboard() {
+      populateDropdownFilters();
+      const filtered = getFilteredData();
+
+      const activeLineBadge = document.getElementById('activeLineBadge');
+      if (activeLineBadge) {
+        activeLineBadge.innerText = selectedLineGroup === 'ALL' ? '전체 라인' : selectedLineGroup;
+      }
+
+      let totalQty = 0;
+      let totalLoss = 0;
+      const machineMap = {};
+      const defectCountMap = {};
+      DEFECT_KEYS.forEach(d => defectCountMap[d.key] = 0);
+
+      filtered.forEach(item => {
+        let recQty = item.totalQty;
+        let recLoss = item.lossAmount;
+        if (selectedDefectType !== 'ALL') {
+          recQty = item.defects[selectedDefectType] || 0;
+          recLoss = recQty * (item.unitPrice || 0);
+        }
+        totalQty += recQty;
+        totalLoss += recLoss;
+
+        if (!machineMap[item.machine]) machineMap[item.machine] = { qty: 0, loss: 0 };
+        machineMap[item.machine].qty += recQty;
+        machineMap[item.machine].loss += recLoss;
+
+        DEFECT_KEYS.forEach(d => { defectCountMap[d.key] += (item.defects[d.key] || 0); });
+      });
+
+      const avgUnitPrice = totalQty > 0 ? Math.round(totalLoss / totalQty) : 0;
+      const sortedMachines = Object.entries(machineMap).sort((a, b) => b[1].loss - a[1].loss);
+      const topMachineName = sortedMachines.length > 0 ? sortedMachines[0][0] : '-';
+      const topMachineQty = sortedMachines.length > 0 ? sortedMachines[0][1].qty : 0;
+      const topMachineLoss = sortedMachines.length > 0 ? sortedMachines[0][1].loss : 0;
+
+      const sortedDefects = Object.entries(defectCountMap).sort((a, b) => b[1] - a[1]);
+      const topDefectKey = sortedDefects.length > 0 ? sortedDefects[0][0] : 'dent';
+      const topDefectDef = DEFECT_KEYS.find(d => d.key === topDefectKey);
+      const topDefectName = topDefectDef ? topDefectDef.label : '-';
+      const topDefectQty = sortedDefects.length > 0 ? sortedDefects[0][1] : 0;
+      const topDefectShare = totalQty > 0 ? ((topDefectQty / totalQty) * 100).toFixed(1) : 0;
+
+      document.getElementById('kpiDefectQty').innerText = totalQty.toLocaleString();
+      document.getElementById('kpiMachineCount').innerText = `${Object.keys(machineMap).length}대 설비 가동`;
+      document.getElementById('kpiDefectVal').innerText = Math.round(totalLoss).toLocaleString();
+      document.getElementById('kpiAvgPrice').innerText = `₩${avgUnitPrice.toLocaleString()}`;
+      document.getElementById('kpiTopMachine').innerText = topMachineName;
+      document.getElementById('kpiTopMachineStats').innerText = `${topMachineQty.toLocaleString()}개 (₩${Math.round(topMachineLoss).toLocaleString()})`;
+      document.getElementById('kpiTopDefectType').innerText = topDefectName;
+      document.getElementById('kpiTopDefectShare').innerText = `${topDefectQty.toLocaleString()}개 (${topDefectShare}%)`;
+
+      updateTimelineTrendChart(filtered);
+      updateLineOrMachineComparisonChart(filtered);
+      renderPivotMatrixTable(filtered);
+      renderGroupedDetailedMatrixTable();
+    }
+
+    function updateTimelineTrendChart(records) {
+      if (!trendChartInstance) return;
+      const groupMap = {};
+      records.forEach(item => {
+        let key = item.weekLabel || item.week;
+        if (!groupMap[key]) groupMap[key] = { qty: 0, loss: 0 };
+        let q = item.totalQty;
+        let l = item.lossAmount;
+        if (selectedDefectType !== 'ALL') {
+          q = item.defects[selectedDefectType] || 0;
+          l = q * (item.unitPrice || 0);
+        }
+        groupMap[key].qty += q;
+        groupMap[key].loss += l;
+      });
+
+      const sortedKeys = Object.keys(groupMap).sort().reverse();
+      trendChartInstance.data.labels = sortedKeys;
+      trendChartInstance.data.datasets[0].data = sortedKeys.map(k => groupMap[k].qty);
+      trendChartInstance.data.datasets[1].data = sortedKeys.map(k => Math.round(groupMap[k].loss / 10000));
+      trendChartInstance.update();
+    }
+
+    function updateLineOrMachineComparisonChart(records) {
+      if (!lineChartInstance) return;
+
+      const titleEl = document.getElementById('lineComparisonTitle');
+      const badgeEl = document.getElementById('lineComparisonBadge');
+      const descEl = document.getElementById('lineComparisonDesc');
+
+      let labels = [];
+      let qtyData = [];
+      let lossData = [];
+
+      if (selectedLineGroup === 'ALL') {
+        if (titleEl) titleEl.innerText = '라인별 불량 수량 및 손실액';
+        if (badgeEl) {
+          badgeEl.innerText = '4대 라인 비교';
+          badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200';
+        }
+        if (descEl) descEl.innerText = 'TR · PR · 소형 · 자동화 라인별 불량 집중도 파악';
+
+        const lineMap = {};
+        ORDERED_GROUPS.forEach(g => lineMap[g] = { qty: 0, loss: 0 });
+
+        records.forEach(item => {
+          if (!lineMap[item.group]) lineMap[item.group] = { qty: 0, loss: 0 };
+          let q = item.totalQty;
+          let l = item.lossAmount;
+          if (selectedDefectType !== 'ALL') {
+            q = item.defects[selectedDefectType] || 0;
+            l = q * (item.unitPrice || 0);
+          }
+          lineMap[item.group].qty += q;
+          lineMap[item.group].loss += l;
+        });
+
+        labels = ORDERED_GROUPS;
+        qtyData = ORDERED_GROUPS.map(g => lineMap[g].qty);
+        lossData = ORDERED_GROUPS.map(g => Math.round(lineMap[g].loss / 10000));
+
+      } else {
+        if (titleEl) titleEl.innerText = `${selectedLineGroup} 설비별 불량 현황`;
+        if (badgeEl) {
+          badgeEl.innerText = `${selectedLineGroup} 소속 설비`;
+          badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200';
+        }
+        if (descEl) descEl.innerText = `선택된 ${selectedLineGroup} 내 각 설비별 불량 수량 및 손실금액 비교`;
+
+        const targetMachines = STANDARD_MACHINES.filter(m => m.group === selectedLineGroup);
+        const mDefMap = {};
+        targetMachines.forEach(m => mDefMap[m.name] = { qty: 0, loss: 0 });
+
+        records.forEach(item => {
+          if (mDefMap[item.machine]) {
+            let q = item.totalQty;
+            let l = item.lossAmount;
+            if (selectedDefectType !== 'ALL') {
+              q = item.defects[selectedDefectType] || 0;
+              l = q * (item.unitPrice || 0);
+            }
+            mDefMap[item.machine].qty += q;
+            mDefMap[item.machine].loss += l;
+          }
+        });
+
+        labels = targetMachines.map(m => m.name.replace('대형 ', '').replace('호기', '호'));
+        qtyData = targetMachines.map(m => mDefMap[m.name].qty);
+        lossData = targetMachines.map(m => Math.round(mDefMap[m.name].loss / 10000));
+      }
+
+      lineChartInstance.data.labels = labels;
+      lineChartInstance.data.datasets[0].data = qtyData;
+      lineChartInstance.data.datasets[1].data = lossData;
+      lineChartInstance.update();
+    }
+
+    function renderPivotMatrixTable(records) {
+      const thead = document.getElementById('pivotTableHeaderRow');
+      const tbody = document.getElementById('pivotTableBody');
+      const tfoot = document.getElementById('pivotTableFoot');
+      const emptyState = document.getElementById('tableEmptyState');
+      document.getElementById('tableRecordCountBadge').innerText = `${records.length}건`;
+
+      if (records.length === 0) {
+        thead.innerHTML = ''; tbody.innerHTML = ''; tfoot.innerHTML = '';
+        emptyState.classList.remove('hidden'); return;
+      }
+      emptyState.classList.add('hidden');
+
+      const weekSet = new Set();
+      records.forEach(r => weekSet.add(r.week));
+      const sortedWeeksDesc = Array.from(weekSet).sort().reverse();
+
+      let headerHtml = isGroupByLineChecked 
+        ? `<th class="py-3 px-4 text-left w-56 bg-sky-950 font-bold">라인 구분 (대분류 그룹)</th>` 
+        : `<th class="py-3 px-3 text-left w-40 min-w-[150px] bg-sky-950">설비명</th><th class="py-3 px-3 text-center w-28 bg-sky-900">라인 구분</th>`;
+
+      sortedWeeksDesc.forEach((w, idx) => {
+        const sample = records.find(r => r.week === w);
+        const lbl = sample ? sample.weekLabel : w;
+        const isLatest = idx === 0;
+        headerHtml += `<th class="py-3 px-2 min-w-[130px] text-center ${isLatest ? 'bg-rose-700 font-bold' : 'bg-sky-800'}"><span>${lbl}</span><div class="text-[10px] opacity-90 border-t border-white/20 pt-0.5 flex justify-around"><span>수량(EA)</span><span>금액(원)</span></div></th>`;
+      });
+      headerHtml += `<th class="py-3 px-3 text-center bg-amber-400 text-rose-950 font-extrabold min-w-[90px]">누적 수량</th><th class="py-3 px-3 text-right bg-amber-400 text-rose-950 font-extrabold min-w-[110px]">총 손실금액</th>`;
+      thead.innerHTML = headerHtml;
+
+      let totalQtySum = 0, totalLossSum = 0;
+      const weekQtySums = {}, weekLossSums = {};
+      sortedWeeksDesc.forEach(w => { weekQtySums[w] = 0; weekLossSums[w] = 0; });
+
+      const rowsHtml = [];
+
+      if (isGroupByLineChecked) {
+        const targetGroups = selectedLineGroup === 'ALL' ? ORDERED_GROUPS : [selectedLineGroup];
+
+        targetGroups.forEach(grpName => {
+          let gTotalQty = 0, gTotalLoss = 0;
+          let weekCells = '';
+
+          sortedWeeksDesc.forEach(w => {
+            const matchedRecords = records.filter(r => r.group === grpName && r.week === w);
+            const q = matchedRecords.reduce((sum, r) => sum + r.totalQty, 0);
+            const l = matchedRecords.reduce((sum, r) => sum + r.lossAmount, 0);
+
+            gTotalQty += q; gTotalLoss += l;
+            weekQtySums[w] += q; weekLossSums[w] += l;
+
+            weekCells += `<td class="py-3 px-2 text-center font-mono text-[11px] ${q > 0 ? 'bg-amber-50/40' : 'text-slate-300'}"><div class="flex justify-around items-center"><span class="${q > 0 ? 'font-bold text-slate-900' : ''}">${q > 0 ? q.toLocaleString() : '-'}</span><span class="${l > 0 ? 'text-rose-700 font-semibold text-[10px]' : ''}">${l > 0 ? '₩' + l.toLocaleString() : '-'}</span></div></td>`;
+          });
+
+          totalQtySum += gTotalQty; totalLossSum += gTotalLoss;
+
+          rowsHtml.push(`<tr class="hover:bg-rose-50/30 transition-colors font-semibold">
+            <td class="py-3 px-4 text-slate-900 font-extrabold flex items-center gap-2 whitespace-nowrap">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+              <span>${grpName}</span>
+              <span class="text-[11px] font-normal text-slate-400">(${STANDARD_MACHINES.filter(m => m.group === grpName).length}개 설비)</span>
+            </td>
+            ${weekCells}
+            <td class="py-3 px-3 text-center font-mono font-extrabold text-rose-700 bg-rose-50/60">${gTotalQty > 0 ? gTotalQty.toLocaleString() : '-'}</td>
+            <td class="py-3 px-3 text-right font-mono font-extrabold text-rose-800 bg-rose-50/40">${gTotalLoss > 0 ? '₩' + gTotalLoss.toLocaleString() : '-'}</td>
+          </tr>`);
+        });
+
+      } else {
+        STANDARD_MACHINES.forEach(mMeta => {
+          if (selectedLineGroup !== 'ALL' && mMeta.group !== selectedLineGroup) return;
+
+          let mTotalQty = 0, mTotalLoss = 0;
+          let weekCells = '';
+
+          sortedWeeksDesc.forEach(w => {
+            const matched = records.find(r => r.machine === mMeta.name && r.week === w);
+            const q = matched ? matched.totalQty : 0;
+            const l = matched ? matched.lossAmount : 0;
+            mTotalQty += q; mTotalLoss += l;
+            weekQtySums[w] += q; weekLossSums[w] += l;
+
+            weekCells += `<td class="py-2.5 px-2 text-center font-mono text-[11px] ${q > 0 ? 'bg-amber-50/40' : 'text-slate-300'}"><div class="flex justify-around items-center"><span class="${q > 0 ? 'font-bold text-slate-900' : ''}">${q > 0 ? q.toLocaleString() : '-'}</span><span class="${l > 0 ? 'text-rose-700 font-semibold text-[10px]' : ''}">${l > 0 ? '₩' + l.toLocaleString() : '-'}</span></div></td>`;
+          });
+
+          totalQtySum += mTotalQty; totalLossSum += mTotalLoss;
+          rowsHtml.push(`<tr class="hover:bg-slate-50"><td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">${mMeta.name}</td><td class="py-2.5 px-3 text-center"><span class="px-2 py-0.5 rounded text-[11px] bg-slate-100 font-semibold">${mMeta.group}</span></td>${weekCells}<td class="py-2.5 px-3 text-center font-mono font-bold text-rose-700 bg-rose-50/60">${mTotalQty > 0 ? mTotalQty.toLocaleString() : '-'}</td><td class="py-2.5 px-3 text-right font-mono font-bold text-rose-800 bg-rose-50/40">${mTotalLoss > 0 ? '₩' + mTotalLoss.toLocaleString() : '-'}</td></tr>`);
+        });
+      }
+
+      tbody.innerHTML = rowsHtml.join('');
+
+      let footWeekCells = '';
+      sortedWeeksDesc.forEach(w => {
+        footWeekCells += `<td class="py-3 px-2 text-center font-mono text-[11px] bg-slate-200"><div class="flex justify-around font-bold text-slate-900"><span>${weekQtySums[w].toLocaleString()}</span><span class="text-rose-800 text-[10px]">₩${weekLossSums[w].toLocaleString()}</span></div></td>`;
+      });
+      tfoot.innerHTML = `<tr><td colspan="${isGroupByLineChecked ? 1 : 2}" class="py-3 px-4 text-center font-bold bg-slate-300">주차별 총 합계 (수량 | 금액)</td>${footWeekCells}<td class="py-3 px-3 text-center font-extrabold text-rose-800 bg-rose-200">${totalQtySum.toLocaleString()}</td><td class="py-3 px-3 text-right font-extrabold text-rose-900 bg-rose-200">₩${totalLossSum.toLocaleString()}</td></tr>`;
+    }
+
+    // [정렬/간격 개선] 설비명 텍스트 줄바꿈 방지 및 라인구분 뱃지 정렬
+    function renderGroupedDetailedMatrixTable() {
+      const tbody = document.getElementById('matrixTableBody');
+      const tfoot = document.getElementById('matrixTableFoot');
+      if (!tbody) return;
+
+      const subSet = new Set();
+      weeklyDefectRecords.forEach(i => subSet.add(i.week));
+      const sortedWeeksDesc = Array.from(subSet).sort().reverse();
+
+      let overallQty = 0, overallLoss = 0;
+      const overallDefects = { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 };
+      const rows = [];
+
+      STANDARD_MACHINES.forEach(mMeta => {
+        if (selectedLineGroup !== 'ALL' && mMeta.group !== selectedLineGroup) return;
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          if (!mMeta.name.toLowerCase().includes(q) && !mMeta.group.toLowerCase().includes(q)) return;
+        }
+
+        const machineRecords = weeklyDefectRecords.filter(r => r.machine === mMeta.name);
+        if (machineRecords.length === 0) return;
+
+        let mSubQty = 0, mSubLoss = 0;
+        const mSubDefects = { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 };
+
+        // 라인구분 텍스트를 "대형프레스"와 "(TR)"으로 깔끔하게 줄바꿈 분리
+        const formattedGroup = mMeta.group.replace('(', '<br>(');
+
+        sortedWeeksDesc.forEach((w, wIdx) => {
+          const matched = machineRecords.find(r => r.week === w);
+          const sampleWeek = weeklyDefectRecords.find(r => r.week === w);
+          const wLabel = sampleWeek ? sampleWeek.weekLabel : w;
+
+          const defects = matched ? matched.defects : { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 };
+          const q = matched ? matched.totalQty : 0;
+          const l = matched ? matched.lossAmount : 0;
+
+          mSubQty += q; mSubLoss += l;
+          DEFECT_KEYS.forEach(d => {
+            mSubDefects[d.key] += (defects[d.key] || 0);
+            overallDefects[d.key] += (defects[d.key] || 0);
+          });
+
+          const isFirstRow = wIdx === 0;
+          const rowspan = sortedWeeksDesc.length + 1;
+
+          rows.push(`<tr class="hover:bg-slate-50 transition-colors">
+            ${isFirstRow ? `
+              <td rowspan="${rowspan}" class="py-3 px-3 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/50 align-middle whitespace-nowrap">
+                <div class="text-[13px] tracking-tight">${mMeta.name}</div>
+              </td>
+              <td rowspan="${rowspan}" class="py-3 px-2 border-r border-slate-200 bg-slate-50/30 align-middle text-center">
+                <div class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-lg bg-slate-100 text-[11px] font-semibold leading-tight text-slate-700">
+                  ${formattedGroup}
+                </div>
+              </td>` : ''}
+            <td class="py-2 px-2 text-center font-bold whitespace-nowrap ${wIdx === 0 ? 'text-rose-700 bg-rose-50/40' : 'text-slate-600'}">${wLabel}</td>
+            ${DEFECT_KEYS.map(d => `<td class="py-2 px-2 text-center font-mono ${defects[d.key] > 0 ? 'font-semibold text-slate-900' : 'text-slate-300'}">${defects[d.key] > 0 ? defects[d.key].toLocaleString() : '-'}</td>`).join('')}
+            <td class="py-2 px-2.5 text-center font-mono font-bold text-rose-600 bg-rose-50/30">${q > 0 ? q.toLocaleString() : '-'}</td>
+            <td class="py-2 px-3 text-right font-mono font-bold text-rose-700 bg-rose-50/20">${l > 0 ? '₩' + l.toLocaleString() : '-'}</td>
+          </tr>`);
+        });
+
+        overallQty += mSubQty;
+        overallLoss += mSubLoss;
+
+        rows.push(`<tr class="bg-amber-50/60 font-bold border-b-2 border-slate-200 text-slate-900">
+          <td class="py-2 px-2 text-center text-[11px] text-amber-900 font-extrabold bg-amber-100/70 whitespace-nowrap">설비 소계</td>
+          ${DEFECT_KEYS.map(d => `<td class="py-2 px-2 text-center font-mono font-extrabold text-amber-950">${mSubDefects[d.key] > 0 ? mSubDefects[d.key].toLocaleString() : '-'}</td>`).join('')}
+          <td class="py-2 px-2.5 text-center font-mono font-extrabold text-rose-700 bg-amber-100/50">${mSubQty > 0 ? mSubQty.toLocaleString() : '-'}</td>
+          <td class="py-2 px-3 text-right font-mono font-extrabold text-rose-800 bg-amber-100/50">${mSubLoss > 0 ? '₩' + mSubLoss.toLocaleString() : '-'}</td>
+        </tr>`);
+      });
+
+      tbody.innerHTML = rows.join('');
+
+      tfoot.innerHTML = `<tr>
+        <td colspan="3" class="py-3 px-4 text-center font-extrabold bg-slate-300 text-slate-900">전체 누적 총 합계</td>
+        ${DEFECT_KEYS.map(d => `<td class="py-3 px-2 text-center font-mono font-extrabold text-slate-900">${overallDefects[d.key].toLocaleString()}</td>`).join('')}
+        <td class="py-3 px-2.5 text-center font-extrabold text-rose-800 bg-rose-200">${overallQty.toLocaleString()}</td>
+        <td class="py-3 px-3 text-right font-extrabold text-rose-900 bg-rose-200">₩${overallLoss.toLocaleString()}</td>
+      </tr>`;
+    }
+
+    function parseWeeklyMatrixData(matrixData, sourceName) {
+      if (!matrixData || matrixData.length < 3) return showToast('파싱 데이터가 부족합니다.', 'error');
+      const newParsedList = [];
+      let currentWeekLabel = '37주차';
+      let currentWeekCode = '2026-W37';
+      let currentType = 'weekly';
+
+      for (let r = 0; r < matrixData.length; r++) {
+        const row = matrixData[r];
+        if (!row) continue;
+        const rowStr = row.map(c => String(c || '').trim()).join(' ');
+
+        const wMatch = rowStr.match(/(\d{1,2})주차/);
+        const mMatch = rowStr.match(/(\d{1,2})월/);
+        if (wMatch) {
+          const wNum = String(wMatch[1]).padStart(2, '0');
+          currentWeekCode = `2026-W${wNum}`;
+          currentWeekLabel = `${wNum}주차`;
+          currentType = 'weekly';
+          continue;
+        } else if (mMatch) {
+          const mNum = String(mMatch[1]).padStart(2, '0');
+          currentWeekCode = `2026-M${mNum}`;
+          currentWeekLabel = `${mNum}월`;
+          currentType = 'monthly';
+          continue;
+        }
+
+        const cell0 = String(row[0] || '').trim();
+        const matchedStd = STANDARD_MACHINES.find(m => cell0.includes(m.name) || m.name.includes(cell0));
+
+        if (matchedStd) {
+          const numAt = idx => parseInt(String(row[idx] || '').replace(/[^0-9.-]+/g, '')) || 0;
+          const mat = numAt(1), setup = numAt(2), dimSec = numAt(3), burr = numAt(4), dent = numAt(5), scratch = numAt(6), dimGauge = numAt(7), shape = numAt(8), marking = numAt(9);
+          const sumQty = numAt(10) || (mat + setup + dimSec + burr + dent + scratch + dimGauge + shape + marking);
+          const lossAmt = numAt(11) || (sumQty * 500);
+          const unitP = numAt(12) || (sumQty > 0 ? Math.round(lossAmt / sumQty) : 500);
+
+          newParsedList.push({
+            week: currentWeekCode,
+            weekLabel: currentWeekLabel,
+            type: currentType,
+            year: '2026',
+            group: matchedStd.group,
+            machine: matchedStd.name,
+            defects: { mat, setup, dimSec, burr, dent, scratch, dimGauge, shape, marking },
+            totalQty: sumQty,
+            lossAmount: lossAmt,
+            unitPrice: unitP
+          });
+        }
+      }
+
+      if (newParsedList.length > 0) {
+        const incomingKeys = new Set(newParsedList.map(item => `${item.week}_${item.machine}`));
+        weeklyDefectRecords = weeklyDefectRecords.filter(existing => !incomingKeys.has(`${existing.week}_${existing.machine}`));
+        weeklyDefectRecords = weeklyDefectRecords.concat(newParsedList);
+        localStorage.setItem('weekly_machine_defect_records_v7', JSON.stringify(weeklyDefectRecords));
+        populatePeriodSelectors();
+        resetAllFilters();
+        showToast(`'${sourceName}' 데이터 동기화 완료`, 'success');
+      } else {
+        showToast('인식된 설비 데이터가 없습니다.', 'error');
+      }
+    }
+
+    function openPasteModal() { document.getElementById('pasteModal').classList.remove('hidden'); }
+    function closePasteModal() { document.getElementById('pasteModal').classList.add('hidden'); }
+    function processPastedDefectText() {
+      const text = document.getElementById('pasteTextArea').value.trim();
+      if (!text) return showToast('붙여넣을 텍스트가 없습니다.', 'error');
+      const matrix = text.split(/\r\n|\n|\r/).map(l => l.includes('\t') ? l.split('\t') : l.split(','));
+      parseWeeklyMatrixData(matrix, '붙여넣은 데이터');
+      closePasteModal();
+    }
+
+    function exportToExcel() {
+      const filtered = getFilteredData();
+      const ws = XLSX.utils.json_to_sheet(filtered);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '설비별불량집계');
+      XLSX.writeFile(wb, `설비별_불량집계_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast('엑셀 파일 다운로드 완료', 'success');
+    }
+
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').innerText = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      // 세션 인증 체크
+      if (sessionStorage.getItem('_db_access_auth_') === 'granted') {
+        document.getElementById('securityLockModal').classList.add('hidden');
+        document.getElementById('mainDashboardApp').classList.remove('blur-sm', 'pointer-events-none');
+      }
+
+      try {
+        const saved = localStorage.getItem('weekly_machine_defect_records_v7');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) weeklyDefectRecords = parsed;
+          else initDefaultData();
+        } else {
+          initDefaultData();
+        }
+      } catch (e) {
+        initDefaultData();
+      }
+
+      initDefectCharts();
+      populatePeriodSelectors();
+      updateDefectDashboard();
+
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        updateDefectDashboard();
+      });
+
+      document.getElementById('excelFileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            workbook.SheetNames.forEach(sheetName => {
+              const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+              parseWeeklyMatrixData(jsonData, file.name);
+            });
+          } catch (err) {
+            showToast('엑셀 오류: ' + err.message, 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+        e.target.value = '';
+      });
+    });
+  </script>
+</body>
+</html>
