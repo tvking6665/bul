@@ -38,7 +38,7 @@
     if (/로봇/.test(n)) return '로봇라인';
     if (/셔틀/.test(n)) return '셔틀라인';
     if (/동기화/.test(n)) return '동기화라인';
-    const m = n.match(/^(\d{3})[-_](\d)$/) || n.match(/(\d{3})톤.*?(\d)호기/);
+    const m = n.match(/(\d{3})[^\d]{0,6}?(\d)/);
     return m ? m[1] + '-' + m[2] : n;
   }
 
@@ -163,6 +163,15 @@
     return [f(s0), f(e0)];
   }
 
+  function dayVal(mc, d, mes) {
+    const ps = S.plans.filter(p => p.date === d && p.machine === mc);
+    let plan = 0;
+    ps.forEach(p => { plan += p.qty || capOf(PATTERNS[p.shift || S.pattern].h, ctOf(p.code, mc)); });
+    const upl = S.actuals.filter(a => a.date === d && a.machine === mc).reduce((a, b) => a + b.qty, 0);
+    const act = d === todayStr() && mes[mc] !== undefined ? mes[mc] : upl;
+    return { plan, act };
+  }
+
   function build() {
     const [from, to] = range(), inR = d => d >= from && d <= to;
     const t = todayStr(), useMes = inR(t), mes = useMes ? mesActual() : {};
@@ -220,6 +229,7 @@
         <h3 class="font-bold text-white text-sm mb-3">설비별 계획 vs 실적 (선: 80% 생산능력)</h3>
         <div class="relative w-full h-[280px]"><canvas id="plChart"></canvas></div>
       </div>
+      <div id="plDaily"></div>
       <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
         <div class="overflow-x-auto"><table class="w-full text-left text-xs border-collapse">
           <thead><tr class="bg-slate-800/80 text-slate-300 border-b border-slate-700">
@@ -229,7 +239,8 @@
             <th class="py-3 px-4 w-48">달성률</th></tr></thead>
           <tbody id="plBody" class="divide-y divide-slate-800 text-slate-300"></tbody>
         </table></div>
-      </div>`;
+      </div>
+      <div id="plMesNote"></div>`;
 
     $('plPattern').value = S.pattern;
     $('plDate').value = date;
@@ -271,6 +282,32 @@
         <td class="py-3 px-4 text-right font-mono ${r.load > 100 ? 'text-rose-400 font-bold' : ''}">${r.load ? r.load.toFixed(0) + '%' : '-'}</td>
         <td class="py-3 px-4">${r.rate === null ? '-' : `<div class="flex items-center gap-2"><div class="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden"><div class="h-full ${color(r.rate)}" style="width:${Math.min(r.rate, 100)}%"></div></div><span class="font-mono font-bold w-12 text-right">${r.rate.toFixed(1)}%</span></div>`}</td>
       </tr>`).join('');
+
+    // ----- 일자별 (월~토/일) 표: 칸마다 실적 / 계획 -----
+    const dv = $('plDaily');
+    if (mode === 'week') {
+      const wk = ['월', '화', '수', '목', '금', '토', '일'], days = [], b0 = new Date(rg[0] + 'T12:00:00');
+      for (let i = 0; i < 7; i++) { const x = new Date(b0); x.setDate(b0.getDate() + i); days.push(x.toLocaleDateString('sv-SE')); }
+      const mesD = days.includes(todayStr()) ? mesActual() : {};
+      const grid = rows.map(r => days.map(d => dayVal(r.mc, d, mesD)));
+      const nDays = grid.some(g => g[6].plan || g[6].act) ? 7 : 6;      // 일요일은 데이터 있을 때만
+      const cell = c => !c.plan && !c.act ? '<span class="text-slate-700">-</span>'
+        : `<span class="${c.plan ? (c.act / c.plan >= .95 ? 'text-emerald-400' : c.act / c.plan >= .8 ? 'text-amber-400' : 'text-rose-400') : 'text-emerald-400'} font-bold">${fmt(c.act)}</span><span class="text-slate-500"> / ${fmt(c.plan)}</span>`;
+      let h = `<tr class="bg-slate-800/80 text-slate-300 border-b border-slate-700"><th class="py-3 px-4">설비</th>`;
+      for (let i = 0; i < nDays; i++) h += `<th class="py-3 px-3 text-center ${days[i] === todayStr() ? 'text-amber-300' : ''}">${wk[i]}<div class="text-[10px] font-normal text-slate-500">${days[i].slice(5)}</div></th>`;
+      h += `<th class="py-3 px-3 text-center">주간 합계</th></tr>`;
+      const body = rows.map((r, ri) => `<tr class="hover:bg-slate-800/40 ${r.hasPlan || r.act ? '' : 'opacity-40'}"><td class="py-2.5 px-4 font-bold text-white">${esc(r.mc)}</td>`
+        + grid[ri].slice(0, nDays).map(c => `<td class="py-2.5 px-3 text-center font-mono">${cell(c)}</td>`).join('')
+        + `<td class="py-2.5 px-3 text-center font-mono">${cell({ plan: r.plan, act: r.act })}</td></tr>`).join('');
+      const tot = days.slice(0, nDays).map((d, i) => grid.reduce((a, g) => ({ plan: a.plan + g[i].plan, act: a.act + g[i].act }), { plan: 0, act: 0 }));
+      const foot = `<tr class="bg-slate-800/60 font-bold"><td class="py-3 px-4 text-white">합계</td>${tot.map(c => `<td class="py-3 px-3 text-center font-mono">${cell(c)}</td>`).join('')}<td class="py-3 px-3 text-center font-mono">${cell({ plan: tp, act: ta })}</td></tr>`;
+      dv.innerHTML = `<div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden"><div class="p-4 border-b border-slate-800 flex items-center justify-between"><h3 class="font-bold text-white text-sm">일자별 현황 (실적 / 계획)</h3><span class="text-xs text-slate-400">단위: EA</span></div><div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead>${h}</thead><tbody class="divide-y divide-slate-800 text-slate-300">${body}</tbody><tfoot>${foot}</tfoot></table></div></div>`;
+    } else dv.innerHTML = '';
+
+    // ----- 목록에 매칭 안 된 MES 설비 안내 -----
+    let um = [];
+    try { um = [...new Set(realtimeMesList.map(x => x.machine).filter(n => !MACHINES.includes(norm(n))))]; } catch (e) {}
+    $('plMesNote').innerHTML = um.length ? `<div class="text-[11px] text-slate-500 px-1">MES 설비 중 설비 목록과 매칭되지 않아 실적에서 제외된 설비: ${esc(um.join(', '))}</div>` : '';
 
     const cr = rows.filter(r => r.hasPlan || r.act);
     if (chart) chart.destroy();
