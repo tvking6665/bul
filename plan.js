@@ -153,6 +153,13 @@
   });
 
   // ===== 계산 =====
+  const WK = ['일', '월', '화', '수', '목', '금', '토'];
+  const wkOf = d => WK[new Date(d + 'T12:00:00').getDay()];
+  const wl = (a, b) => a === b ? wkOf(a) : wkOf(a) + '~' + wkOf(b);
+  function itemTx(code, it) {
+    const n = it && it.name ? String(it.name).trim() : '';
+    return (n && n !== code ? code + ' ' + n : code).trim();
+  }
   function ctOf(code, mc) {
     const all = S.items.concat(baseItems);
     return all.find(i => i.code === code && i.machine === mc) || all.find(i => i.code === code) || null;
@@ -180,7 +187,8 @@
     ps.forEach(p => { plan += p.qty || capOf(hrsOf(p, mc), ctOf(p.code, mc)); });
     const upl = S.actuals.filter(a => a.date === d && a.machine === mc).reduce((a, b) => a + b.qty, 0);
     const act = d === todayStr() && mes[mc] !== undefined ? mes[mc] : upl;
-    return { plan, act };
+    const tx = [...new Set(ps.map(p => itemTx(p.code, ctOf(p.code, mc))).filter(Boolean))].join(' + ');
+    return { plan, act, tx };
   }
 
   function build() {
@@ -191,19 +199,25 @@
 
     return names.map(mc => {
       const ps = S.plans.filter(p => inR(p.date) && p.machine === mc);
-      let plan = 0; const items = [], capDay = {};
+      let plan = 0; const items = [], capDay = {}, byDay = {};
       ps.forEach(p => {
         const it = ctOf(p.code, mc), c = capOf(hrsOf(p, mc), it);
         plan += p.qty || c;                                   // 계획수량 비어있으면 능력치로 자동 산정
         if (capDay[p.date] === undefined) capDay[p.date] = c; // 하루 능력은 대표 품목 기준
-        const tx = (p.code + (it && it.name ? ' ' + it.name : '')).trim();
+        const tx = itemTx(p.code, it);
         if (tx && !items.includes(tx)) items.push(tx);
+        if (tx) { const a = byDay[p.date] = byDay[p.date] || []; if (!a.includes(tx)) a.push(tx); }
+      });
+      const segs = [];                                      // 같은 품목이 이어지는 날짜 구간 (모델교체 감지)
+      Object.keys(byDay).sort().forEach(d => {
+        const t = byDay[d].join(' + '), last = segs[segs.length - 1];
+        if (last && last.tx === t) last.to = d; else segs.push({ tx: t, from: d, to: d });
       });
       const cap = Object.values(capDay).reduce((a, b) => a + b, 0);
       const useM = useMes && mes[mc] !== undefined;           // 오늘 실적은 MES 우선
       const upl = S.actuals.filter(a => inR(a.date) && a.machine === mc && !(useM && a.date === t)).reduce((a, b) => a + b.qty, 0);
       const act = upl + (useM ? mes[mc] : 0);
-      return { mc, items, plan, cap, act, hasPlan: ps.length > 0,
+      return { mc, items, segs, changed: segs.length > 1, plan, cap, act, hasPlan: ps.length > 0,
                rate: plan ? act / plan * 100 : null, load: cap ? plan / cap * 100 : null };
     });
   }
@@ -289,11 +303,17 @@
       + card('전체 달성률', rate.toFixed(1), '%', rate >= 95 ? 'text-emerald-400' : rate >= 80 ? 'text-amber-400' : 'text-rose-400')
       + card('계획 등록 설비', `${active} / ${rows.length}`, '대', 'text-indigo-400');
 
+    const itemCell = r => {
+      if (!r.segs.length) return '계획 없음';
+      if (!r.changed) return esc(r.segs[0].tx);
+      return r.segs.map(g => `<span class="whitespace-nowrap"><span class="text-slate-200">${esc(g.tx)}</span> <span class="text-slate-500">(${wl(g.from, g.to)})</span></span>`).join(' <span class="text-amber-400 font-bold">→</span> ')
+        + ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">모델교체</span>';
+    };
     const color = r => r >= 95 ? 'bg-emerald-500' : r >= 80 ? 'bg-amber-500' : 'bg-rose-500';
     $('plBody').innerHTML = rows.map(r => `
       <tr class="hover:bg-slate-800/40 ${r.hasPlan || r.act ? '' : 'opacity-40'}">
         <td class="py-3 px-4 font-bold text-white">${esc(r.mc)}</td>
-        <td class="py-3 px-4 text-slate-400">${r.items.length ? esc(r.items.join(', ')) : '계획 없음'}</td>
+        <td class="py-3 px-4 text-slate-400">${itemCell(r)}</td>
         <td class="py-3 px-4 text-right font-mono">${r.cap ? fmt(r.cap) : '-'}</td>
         <td class="py-3 px-4 text-right font-mono">${r.plan ? fmt(r.plan) : '-'}</td>
         <td class="py-3 px-4 text-right font-mono font-bold text-emerald-400">${r.act ? fmt(r.act) : '-'}</td>
@@ -309,13 +329,15 @@
       const mesD = days.includes(todayStr()) ? mesActual() : {};
       const grid = rows.map(r => days.map(d => dayVal(r.mc, d, mesD)));
       const nDays = grid.some(g => g[6].plan || g[6].act) ? 7 : 6;      // 일요일은 데이터 있을 때만
-      const cell = c => !c.plan && !c.act ? '<span class="text-slate-700">-</span>'
-        : `<span class="${c.plan ? (c.act / c.plan >= .95 ? 'text-emerald-400' : c.act / c.plan >= .8 ? 'text-amber-400' : 'text-rose-400') : 'text-emerald-400'} font-bold">${fmt(c.act)}</span><span class="text-slate-500"> / ${fmt(c.plan)}</span>`;
+      const chgOf = g => { let prev = ''; return g.map(c => { const f = !!(c.tx && prev && c.tx !== prev); if (c.tx) prev = c.tx; return f; }); };
+      const cell = (c, chg) => (!c.plan && !c.act ? '<span class="text-slate-700">-</span>'
+        : `<span class="${c.plan ? (c.act / c.plan >= .95 ? 'text-emerald-400' : c.act / c.plan >= .8 ? 'text-amber-400' : 'text-rose-400') : 'text-emerald-400'} font-bold">${fmt(c.act)}</span><span class="text-slate-500"> / ${fmt(c.plan)}</span>`)
+        + (c.tx ? `<div class="text-[10px] leading-tight mt-0.5 font-sans ${chg ? 'text-amber-300 font-bold' : 'text-slate-500'}">${chg ? '▶ ' : ''}${esc(c.tx)}</div>` : '');
       let h = `<tr class="bg-slate-800/80 text-slate-300 border-b border-slate-700"><th class="py-3 px-4">설비</th>`;
       for (let i = 0; i < nDays; i++) h += `<th class="py-3 px-3 text-center ${days[i] === todayStr() ? 'text-amber-300' : ''}">${wk[i]}<div class="text-[10px] font-normal text-slate-500">${days[i].slice(5)}</div></th>`;
       h += `<th class="py-3 px-3 text-center">주간 합계</th></tr>`;
       const body = rows.map((r, ri) => `<tr class="hover:bg-slate-800/40 ${r.hasPlan || r.act ? '' : 'opacity-40'}"><td class="py-2.5 px-4 font-bold text-white">${esc(r.mc)}</td>`
-        + grid[ri].slice(0, nDays).map(c => `<td class="py-2.5 px-3 text-center font-mono">${cell(c)}</td>`).join('')
+        + (cf => grid[ri].slice(0, nDays).map((c, i) => `<td class="py-2.5 px-3 text-center font-mono ${cf[i] ? 'bg-amber-500/10' : ''}">${cell(c, cf[i])}</td>`).join(''))(chgOf(grid[ri]))
         + `<td class="py-2.5 px-3 text-center font-mono">${cell({ plan: r.plan, act: r.act })}</td></tr>`).join('');
       const tot = days.slice(0, nDays).map((d, i) => grid.reduce((a, g) => ({ plan: a.plan + g[i].plan, act: a.act + g[i].act }), { plan: 0, act: 0 }));
       const foot = `<tr class="bg-slate-800/60 font-bold"><td class="py-3 px-4 text-white">합계</td>${tot.map(c => `<td class="py-3 px-3 text-center font-mono">${cell(c)}</td>`).join('')}<td class="py-3 px-3 text-center font-mono">${cell({ plan: tp, act: ta })}</td></tr>`;
