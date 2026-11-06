@@ -14,6 +14,7 @@
   };
   const EFF = 0.8;                         // 목표 효율 80%
   const KEY = 'jw_plan_v1';
+  console.log('[plan.js] v3 loaded');
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -230,7 +231,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-lg font-bold text-white">프레스 라인 생산 계획 및 실적 관리</h2>
-            <p class="text-xs text-slate-400 mt-1">목표 효율 80% 기준 생산능력 · 당일 실적은 MES 자동 반영</p>
+            <p class="text-xs text-slate-400 mt-1">목표 효율 80% 기준 생산능력 · 당일 실적은 MES 자동 반영 <span class="text-amber-400">· plan.js v3 (모델교체 표시)</span></p>
           </div>
           <div class="flex flex-wrap items-center gap-2 text-xs">
             <input type="date" id="plDate" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 font-semibold">
