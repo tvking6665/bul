@@ -7,10 +7,10 @@
   // ===== 설정 (여기만 고치면 됨) =====
   const MACHINES = ['500-1','500-2','500-3','600-1','600-2','600-3','400-1','800-1','800-2','로봇라인','셔틀라인','동기화라인'];
   const PATTERNS = {                       // 근무 패턴별 가동시간(h)
-    D:   { label: '주간 8h',            h: 8 },
-    DO:  { label: '주간+잔업 10.5h',    h: 10.5 },
+    D:   { label: '주간(단근무) 8h',   h: 8 },
+    DO:  { label: '주간+잔업 10h',      h: 10 },
     DN:  { label: '주간+야간 16h',      h: 16 },
-    DON: { label: '주간+잔업+야간 18.5h', h: 18.5 }
+    DON: { label: '주간+잔업+야간 18h', h: 18 }
   };
   const EFF = 0.8;                         // 목표 효율 80%
   const KEY = 'jw_plan_v1';
@@ -27,8 +27,8 @@
   let chart = null;
 
   function load() {
-    try { const v = JSON.parse(localStorage.getItem(KEY)); if (v) return v; } catch (e) {}
-    return { items: [], plans: [], actuals: [], pattern: 'DO' };
+    try { const v = JSON.parse(localStorage.getItem(KEY)); if (v) { v.hours = v.hours || {}; return v; } } catch (e) {}
+    return { items: [], plans: [], actuals: [], hours: {}, pattern: 'DO' };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
@@ -38,7 +38,7 @@
     if (/로봇/.test(n)) return '로봇라인';
     if (/셔틀/.test(n)) return '셔틀라인';
     if (/동기화/.test(n)) return '동기화라인';
-    const m = n.match(/(\d{3})[^\d]{0,6}?(\d)/);
+    const m = n.match(/(?<!\d)(\d{3})(?!\d)[^\d]{0,6}?(\d)/);
     return m ? m[1] + '-' + m[2] : n;
   }
 
@@ -47,7 +47,7 @@
     date: ['날짜', '일자', 'date'], machine: ['설비', 'machine'],
     code: ['품번', '품목코드', 'itemcode', 'code'], name: ['품명', '품목명', 'itemname', 'name'],
     plan: ['계획', 'plan'], actual: ['실적', 'actual'],
-    ct: ['c/t', '사이클', 'cycle'], cav: ['취수', '열수', 'cav'], shift: ['근무', 'shift']
+    ct: ['c/t', '사이클', 'cycle'], cav: ['취수', '열수', 'cav'], shift: ['근무', 'shift'], hours: ['가동시간']
   };
   function pick(row, k) {
     for (const h in row) {
@@ -57,6 +57,7 @@
     return '';
   }
   function nd(v) {
+    if (typeof v === 'number' && v > 20000) return new Date(Math.round((v - 25569) * 86400e3)).toISOString().slice(0, 10);   // 엑셀 일련번호
     if (v instanceof Date) return new Date(v.getTime() + 12 * 3600e3).toLocaleDateString('sv-SE');
     const m = String(v).trim().replace(/[./]/g, '-').match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
     return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '';
@@ -72,15 +73,21 @@
 
   // 시트 하나 → 계획/실적/품목DB 자동 판별
   function ingest(rows) {
-    const cnt = { p: 0, a: 0, i: 0 };
+    const cnt = { p: 0, a: 0, i: 0, h: 0 };
     if (!rows.length) return cnt;
     const h = Object.keys(rows[0]).join('|').replace(/\s/g, '').toLowerCase();
-    const isItems = /c\/t|사이클|cycle/.test(h) && !/날짜|일자|date/.test(h);
+    const isHours = /가동시간/.test(h) && !/날짜|일자|date/.test(h);
+    const isItems = !isHours && /c\/t|사이클|cycle/.test(h) && !/날짜|일자|date/.test(h);
     const hasP = /계획|plan/.test(h), hasA = /실적|actual/.test(h);
     const P = [], A = [], I = [];
 
     rows.forEach(r => {
       const mc = norm(pick(r, 'machine')), code = String(pick(r, 'code')).trim();
+      if (isHours) {
+        const hr = num(pick(r, 'hours'));
+        if (mc && hr > 0) { S.hours[mc] = hr; cnt.h++; }
+        return;
+      }
       if (isItems) {
         if (code) I.push({ code, name: String(pick(r, 'name')).trim(), machine: mc, ct: num(pick(r, 'ct')), cav: num(pick(r, 'cav')) || 1 });
         return;
@@ -108,10 +115,11 @@
     return cnt;
   }
 
-  function finish(tot) {
+  function finish(tot, detail) {
     save(); render();
-    const msg = [tot.p && `계획 ${tot.p}건`, tot.a && `실적 ${tot.a}건`, tot.i && `품목 ${tot.i}건`].filter(Boolean).join(' · ');
-    showToast(msg ? '업로드 완료: ' + msg : '인식된 데이터가 없습니다. 양식을 확인하세요.');
+    if (detail) console.log('[plan.js] 업로드 인식 내역', detail);
+    const msg = [tot.p && `계획 ${tot.p}건`, tot.a && `실적 ${tot.a}건`, tot.i && `품목 ${tot.i}건`, tot.h && `설비기준 ${tot.h}건`].filter(Boolean).join(' · ');
+    showToast(msg ? '업로드 완료: ' + msg : '인식된 데이터가 없습니다. 양식을 확인하세요.' + (detail ? ' (' + detail + ')' : ''));
   }
 
   function readFile(f) {
@@ -119,12 +127,14 @@
     r.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-        const tot = { p: 0, a: 0, i: 0 };
+        const tot = { p: 0, a: 0, i: 0, h: 0 }, det = [];
         wb.SheetNames.forEach(n => {
-          const c = ingest(XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' }));
-          tot.p += c.p; tot.a += c.a; tot.i += c.i;
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
+          const c = ingest(rows);
+          tot.p += c.p; tot.a += c.a; tot.i += c.i; tot.h += c.h;
+          det.push(`${n}: ${rows.length}행→계획${c.p}/실적${c.a}/품목${c.i}/설비${c.h}`);
         });
-        finish(tot);
+        finish(tot, det.join(' | '));
       } catch (err) { showToast('파일 읽기 실패: ' + err.message); }
     };
     r.readAsArrayBuffer(f);
@@ -147,6 +157,7 @@
     const all = S.items.concat(baseItems);
     return all.find(i => i.code === code && i.machine === mc) || all.find(i => i.code === code) || null;
   }
+  const hrsOf = (p, mc) => p.shift ? PATTERNS[p.shift].h : (S.hours[mc] || PATTERNS[S.pattern].h);
   const capOf = (h, it) => it && it.ct > 0 ? h * 3600 * EFF / it.ct * (it.cav || 1) : 0;
 
   function mesActual() {
@@ -166,7 +177,7 @@
   function dayVal(mc, d, mes) {
     const ps = S.plans.filter(p => p.date === d && p.machine === mc);
     let plan = 0;
-    ps.forEach(p => { plan += p.qty || capOf(PATTERNS[p.shift || S.pattern].h, ctOf(p.code, mc)); });
+    ps.forEach(p => { plan += p.qty || capOf(hrsOf(p, mc), ctOf(p.code, mc)); });
     const upl = S.actuals.filter(a => a.date === d && a.machine === mc).reduce((a, b) => a + b.qty, 0);
     const act = d === todayStr() && mes[mc] !== undefined ? mes[mc] : upl;
     return { plan, act };
@@ -182,7 +193,7 @@
       const ps = S.plans.filter(p => inR(p.date) && p.machine === mc);
       let plan = 0; const items = [], capDay = {};
       ps.forEach(p => {
-        const it = ctOf(p.code, mc), c = capOf(PATTERNS[p.shift || S.pattern].h, it);
+        const it = ctOf(p.code, mc), c = capOf(hrsOf(p, mc), it);
         plan += p.qty || c;                                   // 계획수량 비어있으면 능력치로 자동 산정
         if (capDay[p.date] === undefined) capDay[p.date] = c; // 하루 능력은 대표 품목 기준
         const tx = (p.code + (it && it.name ? ' ' + it.name : '')).trim();
@@ -248,7 +259,7 @@
     $('plMode').onchange = e => { mode = e.target.value; render(); };
     $('plPattern').onchange = e => { S.pattern = e.target.value; save(); render(); };
     $('plTpl').onclick = () => { const a = document.createElement('a'); a.href = '생산계획_주간업로드_표준양식.xlsx'; a.download = ''; a.click(); };
-    $('plClear').onclick = () => { if (confirm('업로드한 계획/실적/품목 데이터를 모두 지울까요?')) { S = { items: [], plans: [], actuals: [], pattern: S.pattern }; save(); render(); } };
+    $('plClear').onclick = () => { if (confirm('업로드한 계획/실적/품목 데이터를 모두 지울까요?')) { S = { items: [], plans: [], actuals: [], hours: {}, pattern: S.pattern }; save(); render(); } };
     $('plFile').onchange = e => { [...e.target.files].forEach(readFile); e.target.value = ''; };
     const dz = $('plDrop');
     ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('border-amber-500'); }));
@@ -259,10 +270,17 @@
   }
 
   function render() {
+    try { _render(); } catch (e) { console.error('[plan.js] render 오류', e); const n = $('plMesNote'); if (n) n.innerHTML = `<div class="text-xs text-rose-400 px-1">화면 오류: ${esc(e.message)} (F12 콘솔 확인)</div>`; }
+  }
+  function _render() {
     const v = $('viewPlan');
     if (!v || v.classList.contains('hidden') || !$('plBody')) return;
     $('plDate').value = date; $('plPattern').value = S.pattern; $('plMode').value = mode;
-    const rg = range(); $('plRange').innerText = mode === 'week' ? `${rg[0]} ~ ${rg[1]}` : '';
+    const rg = range();
+    const _ds = S.plans.map(x => x.date).sort(), _inR = _ds.filter(d => d >= rg[0] && d <= rg[1]).length;
+    $('plRange').innerText = (mode === 'week' ? `${rg[0]} ~ ${rg[1]} · ` : '') + (_ds.length
+      ? (_inR ? `계획 ${_inR}건` : `⚠ 이 기간엔 계획 없음 (저장된 계획: ${_ds[0]} ~ ${_ds[_ds.length - 1]} → 날짜를 그 주로 선택)`)
+      : '저장된 계획 없음 (엑셀 업로드 필요)');
     const rows = build();
     const tp = rows.reduce((s, r) => s + r.plan, 0), ta = rows.filter(r => r.hasPlan || r.act).reduce((s, r) => s + r.act, 0);
     const rate = tp ? ta / tp * 100 : 0, active = rows.filter(r => r.hasPlan).length;
@@ -332,5 +350,5 @@
   const _rr = window.renderRealtimeDashboard;
   window.renderRealtimeDashboard = function () { _rr.apply(this, arguments); render(); };
 
-  init();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
