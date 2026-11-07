@@ -131,44 +131,8 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased bg-slate-950 text-slate-100">
 
-  <!-- ================= 0. 보안 잠금 모달 (비밀번호: 7777) ================= -->
-  <div id="securityLockModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden p-6 text-center space-y-4">
-      <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-        <i data-lucide="shield-lock" class="w-6 h-6"></i>
-      </div>
-      <div>
-        <h3 class="text-base font-bold text-slate-800 tracking-tight">시스템 접근 보안 인증</h3>
-        <p class="text-xs text-slate-500 mt-1">대시보드를 열람하려면 비밀번호를 입력하세요.</p>
-      </div>
-
-      <!-- form 태그 대신 div 구성으로 모바일 폼 전송 에러 차단 -->
-      <div class="space-y-3">
-        <input 
-          type="password" 
-          id="systemPasswordInput" 
-          inputmode="numeric"
-          pattern="[0-9]*"
-          placeholder="비밀번호 입력..." 
-          class="w-full px-3 py-2 text-center text-sm font-semibold rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:outline-none tracking-widest text-slate-800"
-          onkeydown="if(event.key === 'Enter') handlePasswordSubmit();"
-          autofocus 
-        />
-        <button 
-          type="button" 
-          onclick="handlePasswordSubmit()"
-          class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer"
-        >
-          인증 확인 및 접속
-        </button>
-      </div>
-
-      <div id="securityErrorMsg" class="text-xs text-rose-600 font-semibold hidden">비밀번호가 올바르지 않습니다.</div>
-    </div>
-  </div>
-
-  <!-- ================= 포털 전체 컨테이너 ================= -->
-  <div id="mainDashboardApp" class="flex-1 flex flex-col blur-sm pointer-events-none transition-all duration-300 min-h-screen">
+  <!-- ================= 포털 전체 컨테이너 (비밀번호 잠금 없이 바로 로드) ================= -->
+  <div id="mainDashboardApp" class="flex-1 flex flex-col transition-all duration-300 min-h-screen">
     
     <!-- 글로벌 탑 네비게이션 헤더 -->
     <header class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md no-print">
@@ -765,51 +729,6 @@
 
   <!-- ================= 스크립트 로직 ================= -->
   <script>
-    // 0. 보안 인증 로직 (신규 비밀번호: 7777)
-    const DASHBOARD_PASS = '7777';
-
-    function handlePasswordSubmit() {
-      const inputEl = document.getElementById('systemPasswordInput');
-      if (!inputEl) return;
-
-      const enteredValue = String(inputEl.value).trim();
-
-      if (enteredValue === DASHBOARD_PASS) {
-        // 모달 닫기
-        const lockModal = document.getElementById('securityLockModal');
-        if (lockModal) lockModal.classList.add('hidden');
-
-        // 메인 대시보드 블러 및 클릭 잠금 해제
-        const mainApp = document.getElementById('mainDashboardApp');
-        if (mainApp) {
-          mainApp.classList.remove('blur-sm', 'pointer-events-none');
-        }
-
-        // 인증 상태 유지 (세션 및 로컬 저장소 동시 보관)
-        sessionStorage.setItem('_db_access_auth_', 'granted');
-        localStorage.setItem('_db_access_auth_perm_', 'granted');
-
-        const errEl = document.getElementById('securityErrorMsg');
-        if (errEl) errEl.classList.add('hidden');
-
-        showToast('보안 인증 성공 (7777)', 'success');
-      } else {
-        const errEl = document.getElementById('securityErrorMsg');
-        if (errEl) {
-          errEl.classList.remove('hidden');
-          errEl.innerText = '비밀번호가 올바르지 않습니다.';
-        }
-        inputEl.value = '';
-        inputEl.focus();
-      }
-    }
-
-    // 하위 호환용 (혹시 모를 기존 폼 호출 대응)
-    function verifyDashboardAccess(e) {
-      if (e) e.preventDefault();
-      handlePasswordSubmit();
-    }
-
     // 화면 전환 (Cover, Realtime, Defect, Plan)
     function switchDashboardView(viewName) {
       const views = ['viewCover', 'viewRealtime', 'viewDefect', 'viewPlan'];
@@ -1287,14 +1206,6 @@
     // ==========================================
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
-
-      // 세션 또는 로컬스토리지에 기존 인증 이력이 있으면 바로 잠금 해제
-      if (sessionStorage.getItem('_db_access_auth_') === 'granted' || localStorage.getItem('_db_access_auth_perm_') === 'granted') {
-        const modal = document.getElementById('securityLockModal');
-        const app = document.getElementById('mainDashboardApp');
-        if (modal) modal.classList.add('hidden');
-        if (app) app.classList.remove('blur-sm', 'pointer-events-none');
-      }
 
       // 1. 실시간 MES 데이터 파싱
       parseMesHtml(DEFAULT_MES_HTML);
