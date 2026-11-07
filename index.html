@@ -4,7 +4,21 @@
   <meta charset="UTF-8" />
   <!-- 모바일 핀치 줌(확대/축소) 허용 메타태그 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes" />
-  <title>통합 제조 운영 및 실시간 모니터링 포털</title>
+  <title>JW 프레스 생산 가동 현황</title>
+
+  <!-- ================= 카카오톡 링크 공유 미리보기 (Open Graph) ================= -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="JW 프레스 생산 가동 현황" />
+  <meta property="og:description" content="터치하여 휴대폰 바탕화면에 전용 앱을 설치하세요." />
+  <meta property="og:image" content="icon.png" />
+
+  <!-- ================= 웹앱(PWA) 및 홈 화면 아이콘 설정 ================= -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -55,7 +69,6 @@
       50% { opacity: .4; transform: scale(1.1); }
     }
 
-    /* 상단 메뉴 가로 터치 스크롤 지원 */
     .nav-badge-group {
       display: flex;
       align-items: center;
@@ -69,7 +82,6 @@
       display: none;
     }
 
-    /* v8 LIVE 스타일 타원형 배지 (Pill) */
     .badge-pill {
       display: inline-flex;
       align-items: center;
@@ -90,7 +102,6 @@
       color: #ffffff;
     }
 
-    /* 플로팅 줌 컨트롤러 */
     .zoom-toolbar {
       position: fixed;
       bottom: 24px;
@@ -121,7 +132,7 @@
     }
 
     @media print {
-      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar, footer {
+      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar, footer, #pwaInstallBanner {
         display: none !important;
       }
       body { background-color: #ffffff !important; font-size: 10pt; color: #000; }
@@ -151,31 +162,26 @@
 
         <!-- 탭 네비게이션: v8 LIVE 스타일 알약(Pill) 배지 그룹 -->
         <nav class="nav-badge-group">
-          <!-- v8 LIVE 배지 (시스템 버전 및 동작 표시기) -->
           <span class="badge-pill bg-rose-500/15 border-rose-500/40 text-rose-300">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-400 badge-pulse"></span>
             <span>v8 LIVE</span>
           </span>
 
-          <!-- 메인 표지 -->
           <button onclick="switchDashboardView('cover')" id="navTabCover" class="badge-pill bg-indigo-600 text-white border-indigo-500 shadow-sm">
             <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
             <span>메인</span>
           </button>
 
-          <!-- 가동 현황 -->
           <button onclick="switchDashboardView('realtime')" id="navTabRealtime" class="badge-pill">
             <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse shadow-[0_0_6px_#34d399]"></span>
             <span>가동현황</span>
           </button>
 
-          <!-- 불량 집계 -->
           <button onclick="switchDashboardView('defect')" id="navTabDefect" class="badge-pill">
             <span class="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f87171]"></span>
             <span>불량집계</span>
           </button>
 
-          <!-- 생산 실적 -->
           <button onclick="switchDashboardView('plan')" id="navTabPlan" class="badge-pill">
             <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></span>
             <span>생산실적</span>
@@ -268,7 +274,7 @@
       </div>
     </section>
 
-    <!-- ================= 2. 실시간 설비 가동 현황판 (NEW Real-time View) ================= -->
+    <!-- ================= 2. 실시간 설비 가동 현황판 ================= -->
     <main id="viewRealtime" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-950">
       
       <!-- 상단 컨트롤 바 -->
@@ -382,12 +388,10 @@
       </div>
 
       <!-- 설비별 실시간 카드 그리드 -->
-      <div id="realtimeCardGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <!-- Javascript로 자동 렌더링됨 -->
-      </div>
+      <div id="realtimeCardGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </main>
 
-    <!-- ================= 3. 설비별 불량집계 및 손실분석 (Defect View) ================= -->
+    <!-- ================= 3. 설비별 불량집계 및 손실분석 ================= -->
     <main id="viewDefect" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-50 text-slate-800 rounded-2xl my-4">
       
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
@@ -561,7 +565,7 @@
       </div>
     </main>
 
-    <!-- ================= 4. 생산 계획 및 가동 현황 (Plan View) ================= -->
+    <!-- ================= 4. 생산 계획 및 가동 현황 ================= -->
     <main id="viewPlan" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-950">
       <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -650,9 +654,8 @@
       </div>
     </main>
 
-    <!-- ================= 하단 푸터 (모바일 2줄 초간소화 적용) ================= -->
+    <!-- ================= 하단 푸터 (모바일 2줄 간소화) ================= -->
     <footer class="mt-auto border-t border-slate-800/80 bg-slate-950/90 py-4 sm:py-6 px-3 text-center text-[11px] sm:text-xs text-slate-500 space-y-1.5 sm:space-y-2 no-print">
-      <!-- 1. 회사명 및 공식 주소 (모바일에서는 숨김, PC 화면 sm: 이상에서만 표시) -->
       <div class="hidden sm:flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-slate-400">
         <span class="font-bold text-slate-300">(주)전우정밀</span>
         <span class="text-slate-700">|</span>
@@ -661,14 +664,12 @@
         <span>TEL. 053-859-5400</span>
       </div>
 
-      <!-- 2. 시스템 문의처 & 관리자 연락처 (모바일: 첫 번째 줄) -->
       <div class="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-slate-300 font-medium">
         <span>시스템 문의: <a href="mailto:mamanager8@jwjm.com" class="text-slate-400 hover:text-emerald-400 underline decoration-slate-600 transition-colors">mamanager8@jwjm.com</a></span>
         <span class="text-slate-700">|</span>
         <span>관리자: <a href="tel:01047016665" class="text-slate-400 hover:text-emerald-400 font-mono transition-colors">010-4701-6665</a></span>
       </div>
 
-      <!-- 3. 카피라이트 (모바일: 두 번째 줄) -->
       <p class="text-[10px] sm:text-[11px] text-slate-600 pt-0.5">
         Copyright © (주)전우정밀 JEONWOO. All Rights Reserved.
       </p>
@@ -676,14 +677,28 @@
 
   </div>
 
-  <!-- ================= 플로팅 화면 배율 컨트롤러 (+ / - / 100%) ================= -->
+  <!-- ================= 원클릭 바로가기 앱 설치 배너 ================= -->
+  <div id="pwaInstallBanner" class="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 z-50 bg-slate-900/95 border border-emerald-500/60 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 hidden">
+    <div class="flex items-center gap-2.5">
+      <img src="icon.png" alt="JW" class="w-9 h-9 rounded-xl object-contain border border-slate-700 shrink-0" onerror="this.src='https://placehold.co/100x100/10b981/ffffff?text=JW'" />
+      <div>
+        <h4 class="text-xs font-bold text-white">JW 생산현황 앱</h4>
+        <p class="text-[10px] text-slate-400 leading-tight">바탕화면에 바로가기 추가</p>
+      </div>
+    </div>
+    <button id="pwaInstallBtn" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-md transition-all">
+      설치하기
+    </button>
+  </div>
+
+  <!-- ================= 플로팅 화면 배율 컨트롤러 ================= -->
   <div class="zoom-toolbar">
     <button type="button" class="zoom-btn" onclick="zoomChange(0.1)" title="확대">+</button>
     <button type="button" class="zoom-btn" onclick="zoomChange(-0.1)" title="축소">−</button>
     <button type="button" class="zoom-btn" onclick="zoomReset()" style="font-size: 11px;">100%</button>
   </div>
 
-  <!-- ================= 모달 1: MES HTML 붙여넣기 모달 ================= -->
+  <!-- 모달 1: MES HTML 붙여넣기 모달 -->
   <div id="mesPasteModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -705,7 +720,7 @@
     </div>
   </div>
 
-  <!-- ================= 모달 2: Worker 자동 연동 URL 설정 모달 ================= -->
+  <!-- 모달 2: Worker 자동 연동 URL 설정 모달 -->
   <div id="workerConfigModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -727,7 +742,7 @@
     </div>
   </div>
 
-  <!-- ================= 모달 3: 불량 데이터 엑셀 붙여넣기 모달 ================= -->
+  <!-- 모달 3: 불량 데이터 엑셀 붙여넣기 모달 -->
   <div id="pasteModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-2xl border border-slate-200 shadow-2xl p-6 space-y-3 text-slate-800">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -753,7 +768,45 @@
 
   <!-- ================= 스크립트 로직 ================= -->
   <script>
-    // 화면 전환 (Cover, Realtime, Defect, Plan)
+    // 0. 카카오톡 인앱 브라우저 탈출 (크롬/삼성인터넷 브라우저로 자동 열기)
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('kakaotalk')) {
+      const targetUrl = window.location.href.replace(/https?:\/\//i, '');
+      window.location.href = 'intent://' + targetUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+    }
+
+    // 1. PWA 설치 이벤트 제어
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.classList.remove('hidden');
+    });
+
+    const installBtn = document.getElementById('pwaInstallBtn');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.classList.add('hidden');
+          }
+          deferredPrompt = null;
+        } else {
+          alert('브라우저 메뉴(⋮)에서 [홈 화면에 추가] 또는 [앱 설치]를 선택해 주세요.');
+        }
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.classList.add('hidden');
+    });
+
+    // 화면 전환
     function switchDashboardView(viewName) {
       const views = ['viewCover', 'viewRealtime', 'viewDefect', 'viewPlan'];
       views.forEach(v => {
@@ -770,9 +823,7 @@
 
       Object.values(tabs).forEach(tId => {
         const btn = document.getElementById(tId);
-        if (btn) {
-          btn.className = "badge-pill";
-        }
+        if (btn) btn.className = "badge-pill";
       });
 
       if (viewName === 'cover') {
@@ -794,14 +845,10 @@
       lucide.createIcons();
     }
 
-    // ==========================================
-    // 1. 실시간 MES 모니터링 엔진
-    // ==========================================
+    // MES 실시간 모니터링 엔진
     let realtimeMesList = [];
     let currentRtFilter = 'ALL';
     let currentRtCategoryFilter = 'ALL';
-
-    // 기본 Worker 주소 지정
     const DEFAULT_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
     let workerApiUrl = localStorage.getItem('jw_mes_worker_url') || DEFAULT_WORKER_URL;
 
@@ -1016,7 +1063,7 @@
       if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
     }
 
-    // 모바일 줌 컨트롤 함수
+    // 줌 컨트롤 함수
     let currentScale = 1.0;
     function zoomChange(delta) {
       currentScale = Math.min(Math.max(currentScale + delta, 0.6), 2.5);
@@ -1027,9 +1074,7 @@
       document.body.style.zoom = 1.0;
     }
 
-    // ==========================================
-    // 2. 불량 집계 대시보드 로직
-    // ==========================================
+    // 불량 집계 대시보드 로직
     const DEFECT_KEYS = [
       { key: 'mat', label: '소재불량(녹)' },
       { key: 'setup', label: '셋업품' },
@@ -1225,21 +1270,14 @@
       setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
     }
 
-    // ==========================================
-    // 3. 초기화 진입
-    // ==========================================
+    // 초기화
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
-
-      // 1. 실시간 MES 데이터 파싱
       parseMesHtml(DEFAULT_MES_HTML);
-
-      // 2. 불량 데이터 및 차트 초기화
       initDefaultData();
       initDefectCharts();
       updateDefectDashboard();
 
-      // 3. Worker 기본 자동 연동 (30초 주기 자동 갱신)
       if (workerApiUrl) {
         refreshMesData();
         setInterval(refreshMesData, 30000);
