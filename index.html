@@ -2,11 +2,12 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- 모바일 핀치 줌(두 손가락 확대/축소) 허용 메타태그 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes" />
   <title>통합 제조 운영 및 실시간 모니터링 포털</title>
 
   <!-- Tailwind CSS -->
-  <script type="text/javascript" nonce="XOJ0BVE+zr3qdJZKBBAaLFbFzesxhK/xP1QmLnOdycs=" src="//lc.getunicorn.org?type=base-script&amp;request-id=30262"></script><script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
@@ -33,16 +34,18 @@
 
   <style>
     body {
-      background-color: #0f172a;
-      color: #1e293b;
+      background-color: #0b1120;
+      color: #f8fafc;
       font-family: 'Noto Sans KR', sans-serif;
       user-select: none;
       -webkit-user-select: none;
+      touch-action: pan-x pan-y pinch-zoom; /* 브라우저 기본 터치 줌 활성화 */
+      overflow-x: hidden;
     }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
     
     .badge-pulse {
       animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -52,11 +55,76 @@
       50% { opacity: .4; transform: scale(1.1); }
     }
 
+    /* 상단 메뉴 가로 터치 스크롤 지원 */
+    .nav-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .nav-badge-group::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* v8 LIVE 스타일 타원형 배지 (Pill) */
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+    }
+    .badge-pill:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+
+    /* 플로팅 줌 컨트롤러 */
+    .zoom-toolbar {
+      position: fixed;
+      bottom: 24px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 9999;
+    }
+    .zoom-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .zoom-btn:active {
+      background: rgba(59, 130, 246, 0.5);
+    }
+
     @media print {
-      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column {
+      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar {
         display: none !important;
       }
-      body { background-color: #ffffff !important; font-size: 10pt; }
+      body { background-color: #ffffff !important; font-size: 10pt; color: #000; }
       main { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
     }
   </style>
@@ -97,46 +165,56 @@
     
     <!-- 글로벌 탑 네비게이션 헤더 -->
     <header class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md no-print">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         
-        <!-- 로고 및 홈 복귀 -->
-        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchDashboardView('cover')">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-md">
-            <i data-lucide="layers" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-base sm:text-lg font-extrabold tracking-tight text-white">JW 통합 제조 포털</span>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">v8 LIVE</span>
-            </div>
-            <p class="text-[11px] text-slate-400 hidden sm:block">전우정밀 스마트 생산·품질·모니터링 운영 허브</p>
-          </div>
+        <!-- 투명화된 JW JEONWOO 벡터 로고 및 홈 복귀 -->
+        <div class="flex items-center space-x-2.5 cursor-pointer shrink-0" onclick="switchDashboardView('cover')" title="(주)전우정밀 메인으로 이동">
+          <svg class="h-7 sm:h-8 w-auto" viewBox="0 0 170 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="26" cy="19" rx="24" ry="17" fill="#FACC15" />
+            <path d="M 26 3 A 22 15 0 0 0 6 19 A 22 15 0 0 0 26 35 Z" fill="#22C55E" />
+            <path d="M 26 3 A 22 15 0 0 1 46 19 A 22 15 0 0 1 26 35 Z" fill="#1D4ED8" />
+            <text x="25" y="24" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="900" fill="#FACC15" text-anchor="middle" font-style="italic">JW</text>
+            <text x="60" y="25" font-family="'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="900" fill="#FFFFFF" letter-spacing="0.5">JEONWOO</text>
+          </svg>
         </div>
 
-        <!-- 탭 네비게이션 버튼 그룹 -->
-        <nav class="flex items-center gap-1 sm:gap-2">
-          <button onclick="switchDashboardView('cover')" id="navTabCover" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-indigo-600 text-white shadow-sm flex items-center gap-1.5">
-            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-            <span class="hidden md:inline">메인 표지</span>
+        <!-- 탭 네비게이션: v8 LIVE 스타일 알약(Pill) 배지 그룹 -->
+        <nav class="nav-badge-group">
+          <!-- v8 LIVE 배지 -->
+          <span class="badge-pill bg-rose-500/15 border-rose-500/40 text-rose-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400 badge-pulse"></span>
+            <span>v8 LIVE</span>
+          </span>
+
+          <!-- 메인 표지 -->
+          <button onclick="switchDashboardView('cover')" id="navTabCover" class="badge-pill bg-indigo-600 text-white border-indigo-500 shadow-sm">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+            <span>메인</span>
           </button>
-          <button onclick="switchDashboardView('realtime')" id="navTabRealtime" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse"></span>
-            <span>실시간 가동 현황</span>
+
+          <!-- 가동 현황 (동그란 인디케이터 도트 적용) -->
+          <button onclick="switchDashboardView('realtime')" id="navTabRealtime" class="badge-pill">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse shadow-[0_0_6px_#34d399]"></span>
+            <span>가동현황</span>
           </button>
-          <button onclick="switchDashboardView('defect')" id="navTabDefect" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
-            <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
-            <span>설비별 불량집계</span>
+
+          <!-- 불량 집계 -->
+          <button onclick="switchDashboardView('defect')" id="navTabDefect" class="badge-pill">
+            <span class="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f87171]"></span>
+            <span>불량집계</span>
           </button>
-          <button onclick="switchDashboardView('plan')" id="navTabPlan" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
-            <i data-lucide="calendar-check-2" class="w-4 h-4 text-amber-400"></i>
-            <span>생산 계획·실적</span>
+
+          <!-- 생산 실적 -->
+          <button onclick="switchDashboardView('plan')" id="navTabPlan" class="badge-pill">
+            <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></span>
+            <span>생산실적</span>
           </button>
         </nav>
       </div>
     </header>
 
-<!-- ================= 1. PPT 스타일 메인 허브 표지 (Cover View) ================= -->
-    <section id="viewCover" class="relative flex-1 flex flex-col justify-center items-center px-4 py-12 w-full min-h-[calc(100vh-4rem)] bg-cover bg-center bg-no-repeat" style="background-image: linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.92)), url('bg.jpg');">
+    <!-- ================= 1. PPT 스타일 메인 허브 표지 (Cover View) ================= -->
+    <section id="viewCover" class="relative flex-1 flex flex-col justify-center items-center px-4 py-12 w-full min-h-[calc(100vh-4rem)] bg-cover bg-center bg-no-repeat" style="background-image: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.94)), url('bg.jpg');">
       <div class="text-center space-y-4 max-w-3xl z-10">
         <!-- 회사 상호명 & 시스템 뱃지 -->
         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-xs font-bold text-sky-400 shadow-lg backdrop-blur-md">
@@ -157,9 +235,9 @@
       </div>
 
       <!-- 3대 모듈 선택 카드 그리드 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-12">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mt-12 z-10 px-2">
         
-        <!-- 카드 1: 실시간 설비 모니터링 (NEW) -->
+        <!-- 카드 1: 실시간 설비 모니터링 -->
         <div onclick="switchDashboardView('realtime')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
           <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
           <div>
@@ -256,7 +334,7 @@
         </div>
       </div>
 
-      <!-- 실시간 KPI 요약 카드 (가동 / 순간비가동 / 계획정지) -->
+      <!-- 실시간 KPI 요약 카드 -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
           <div class="flex items-center justify-between text-xs text-slate-400 font-semibold">
@@ -313,9 +391,8 @@
         </div>
       </div>
 
-      <!-- 실시간 이중 필터 (상태 필터 + 공정 라인 필터) -->
+      <!-- 실시간 이중 필터 -->
       <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
-        <!-- 1. 상태 필터 -->
         <div class="flex items-center gap-2 overflow-x-auto pb-0.5 text-xs">
           <span class="text-slate-400 font-bold shrink-0 w-16">상태 필터:</span>
           <div id="rtFilterPills" class="flex items-center gap-1.5">
@@ -326,7 +403,6 @@
           </div>
         </div>
 
-        <!-- 2. 공정 라인 필터 (신규 추가) -->
         <div class="flex items-center gap-2 overflow-x-auto pb-0.5 text-xs pt-2 border-t border-slate-800/80">
           <span class="text-slate-400 font-bold shrink-0 w-16">라인 필터:</span>
           <div id="rtCategoryPills" class="flex items-center gap-1.5">
@@ -342,7 +418,7 @@
 
       <!-- 설비별 실시간 카드 그리드 -->
       <div id="realtimeCardGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <!-- Javascript로 자동 생성됨 -->
+        <!-- Javascript로 자동 렌더링됨 -->
       </div>
     </main>
 
@@ -612,6 +688,13 @@
 
   </div>
 
+  <!-- ================= 플로팅 화면 배율 컨트롤러 (+ / - / 100%) ================= -->
+  <div class="zoom-toolbar">
+    <button type="button" class="zoom-btn" onclick="zoomChange(0.1)" title="확대">+</button>
+    <button type="button" class="zoom-btn" onclick="zoomChange(-0.1)" title="축소">−</button>
+    <button type="button" class="zoom-btn" onclick="zoomReset()" style="font-size: 11px;">100%</button>
+  </div>
+
   <!-- ================= 모달 1: MES HTML 붙여넣기 모달 ================= -->
   <div id="mesPasteModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
@@ -648,7 +731,7 @@
       <p class="text-xs text-slate-400 leading-relaxed">
         배포해 둔 Cloudflare Worker 중계 주소를 등록하면 30초마다 자동으로 사내 MES를 호출하여 화면을 갱신합니다.
       </p>
-      <input type="text" id="workerApiUrlInput" placeholder="예: https://jw-mes-proxy.tvking6665.workers.dev" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+      <input type="text" id="workerApiUrlInput" placeholder="예: https://floral-wood-cc25.kim6665.workers.dev" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeWorkerConfigModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">취소</button>
         <button onclick="saveWorkerApiUrl()" class="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white">저장 및 자동 동기화</button>
@@ -716,24 +799,24 @@
       Object.values(tabs).forEach(tId => {
         const btn = document.getElementById(tId);
         if (btn) {
-          btn.className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5";
+          btn.className = "badge-pill";
         }
       });
 
       if (viewName === 'cover') {
         document.getElementById('viewCover').classList.remove('hidden');
-        document.getElementById('navTabCover').className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-indigo-600 text-white shadow-sm flex items-center gap-1.5";
+        document.getElementById('navTabCover').className = "badge-pill bg-indigo-600 text-white border-indigo-500 shadow-sm";
       } else if (viewName === 'realtime') {
         document.getElementById('viewRealtime').classList.remove('hidden');
-        document.getElementById('navTabRealtime').className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-1.5";
+        document.getElementById('navTabRealtime').className = "badge-pill bg-emerald-600 text-white border-emerald-500 shadow-sm";
       } else if (viewName === 'defect') {
         document.getElementById('viewDefect').classList.remove('hidden');
-        document.getElementById('navTabDefect').className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-rose-600 text-white shadow-sm flex items-center gap-1.5";
+        document.getElementById('navTabDefect').className = "badge-pill bg-rose-600 text-white border-rose-500 shadow-sm";
         if (trendChartInstance) trendChartInstance.resize();
         if (lineChartInstance) lineChartInstance.resize();
       } else if (viewName === 'plan') {
         document.getElementById('viewPlan').classList.remove('hidden');
-        document.getElementById('navTabPlan').className = "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-amber-600 text-white shadow-sm flex items-center gap-1.5";
+        document.getElementById('navTabPlan').className = "badge-pill bg-amber-600 text-white border-amber-500 shadow-sm";
       }
 
       lucide.createIcons();
@@ -745,9 +828,12 @@
     let realtimeMesList = [];
     let currentRtFilter = 'ALL';
     let currentRtCategoryFilter = 'ALL';
-    let workerApiUrl = localStorage.getItem('jw_mes_worker_url') || '';
 
-    // 설비명 또는 relay 전달 category 기반 공정 라인 자동 분류 함수
+    // 기본 Worker 주소 지정 (다른 모바일/기기에서도 기본 자동 연동)
+    const DEFAULT_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
+    let workerApiUrl = localStorage.getItem('jw_mes_worker_url') || DEFAULT_WORKER_URL;
+
+    // 설비명 기반 라인 분류
     function getMachineCategory(item) {
       if (item.category && item.category !== '기타') return item.category;
       const m = item.machine || '';
@@ -759,7 +845,7 @@
       return '기타';
     }
 
-    // 제공해주신 원본 HTML 기본 시드 데이터
+    // 기본 시드 데이터
     const DEFAULT_MES_HTML = `<HTML> <HEAD> <TITLE>JW Monitoring</TITLE> </HEAD> <BODY> <CENTER> <h1>2026-11-06 오후 3:28:17</h1> </CENTER>
     <CENTER><table><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>650톤 트렌스퍼 7호기<br><br>TMR CUTTER(프레스2)</h1></td><td align=center width = 350><h1><계획정지:7시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 0</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 1호기<br><br>UPPER AS (D037 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 4523</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김성재</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 2호기<br><br>UPPER AA (C021 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5848</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김현기</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 3호기<br><br>MOTOR CAN (SEBA : 프레스 TR)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5270</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>권별희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 1호기<br><br>LOWER 운전석1호 (D051 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 7265</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>신승격</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 2호기<br><br>UPPER PH5 EU (E111 프레스)</h1></td><td align=center width = 350><h1><순간비가동:0분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 2807</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>백남훈</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 3호기<br><br>LOWER PH5 EL (E111 프레스)</h1></td><td align=center width = 350><h1><측정대기:3분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 53</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>장규하</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 1호기<br><br>LIFT BASE BACK PLT(GEN2 프레스1)</h1></td><td align=center width = 350><h1><계획정지:3시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 8890</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 2호기<br><br>LOWER AJ (D111 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2208</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>문용학</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 400톤 1호기<br><br>DR PLT FLH (A100 프레스)</h1></td><td align=center width = 350><h1><계획정지:6시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 1086</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>로봇2라인 (250톤)<br><br>PULLEY (TD라인 2MHA1)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2869</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>이명희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>셔틀 400톤<br><br>PULLEY 9648 (구산 : 셔틀/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2181</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>최한희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 1호기<br><br>Ø124 블랭크 (2열) ( PH5 E116 공용)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 15886</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>미등록작업자</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 2호기<br><br>Ø132 블랭크 (AA/AD/AG )</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 10484</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>박종민</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>하우징 세척 A라인<br><br>UPPER AA (C021 세척/검사/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 8870</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김경희</h1></td></tr></table></CENTER> </BODY> </HTML>`;
 
@@ -791,407 +877,4 @@
           statusText: statusRaw,
           statusType: sType,
           qty: qty,
-          worker: worker,
-          bg: bg
-        });
-      }
-
-      if (parsedList.length > 0) {
-        realtimeMesList = parsedList;
-        renderRealtimeDashboard();
-        showToast(`설비 ${parsedList.length}대 현황 동기화 완료`, 'success');
-      } else {
-        showToast('파싱 가능한 설비 데이터가 없습니다.', 'error');
-      }
-    }
-
-    function renderRealtimeDashboard() {
-      const container = document.getElementById('realtimeCardGrid');
-      if (!container) return;
-
-      const total = realtimeMesList.length;
-      const running = realtimeMesList.filter(x => x.statusType === 'running').length;
-      const wait = realtimeMesList.filter(x => x.statusType === 'wait').length;
-      const stop = realtimeMesList.filter(x => x.statusType === 'stop').length;
-
-      document.getElementById('rtTotalCount').innerText = total;
-      document.getElementById('rtRunningCount').innerText = running;
-      document.getElementById('rtWaitCount').innerText = wait;
-      document.getElementById('rtStopCount').innerText = stop;
-      document.getElementById('rtRunningRate').innerText = total > 0 ? `가동률 ${Math.round((running / total) * 100)}%` : '0%';
-
-      const filtered = realtimeMesList.filter(x => {
-        const matchStatus = (currentRtFilter === 'ALL' || x.statusType === currentRtFilter);
-        const cat = getMachineCategory(x);
-        const matchCategory = (currentRtCategoryFilter === 'ALL' || cat === currentRtCategoryFilter);
-        return matchStatus && matchCategory;
-      });
-
-      if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500 text-xs font-semibold">선택한 조건(상태/라인)에 해당하는 설비가 없습니다.</div>`;
-        return;
-      }
-
-      container.innerHTML = filtered.map(item => {
-        const category = getMachineCategory(item);
-        let borderClass = 'border-slate-800 bg-slate-900';
-        let badgeClass = 'bg-slate-800 text-slate-400 border border-slate-700';
-        let statusDot = 'bg-slate-500';
-
-        if (item.statusType === 'running') {
-          borderClass = 'border-emerald-500/40 bg-gradient-to-br from-slate-900 to-emerald-950/20';
-          badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-          statusDot = 'bg-emerald-400 badge-pulse';
-        } else if (item.statusType === 'wait') {
-          borderClass = 'border-amber-500/40 bg-gradient-to-br from-slate-900 to-amber-950/20';
-          badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
-          statusDot = 'bg-amber-400';
-        }
-
-        return `
-          <div class="rounded-2xl p-4 border ${borderClass} shadow-md transition-all flex flex-col justify-between space-y-3">
-            <div>
-              <div class="flex items-start justify-between gap-2">
-                <div>
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${category}</span>
-                    <h4 class="font-bold text-white text-sm sm:text-base tracking-tight">${item.machine}</h4>
-                  </div>
-                  <p class="text-[11px] text-slate-400 line-clamp-1 mt-0.5" title="${item.part}">${item.part || '대기 품목'}</p>
-                </div>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">
-                  <span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>
-                  <span>${item.statusText || '상태미상'}</span>
-                </span>
-              </div>
-            </div>
-
-            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-              <div>
-                <span class="text-[10px] text-slate-500 block">당일 생산량</span>
-                <span class="text-base sm:text-lg font-black font-mono text-emerald-400">${item.qty.toLocaleString()} <span class="text-xs text-slate-400 font-normal">EA</span></span>
-              </div>
-              <div class="text-right">
-                <span class="text-[10px] text-slate-500 block">담당 작업자</span>
-                <span class="text-xs font-bold text-slate-300">${item.worker || '-'}</span>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      lucide.createIcons();
-    }
-
-    function setRtFilter(filterType) {
-      currentRtFilter = filterType;
-      ['ALL', 'running', 'wait', 'stop'].forEach(f => {
-        const btn = document.getElementById(`rtPill_${f}`);
-        if (!btn) return;
-        if (f === filterType) {
-          btn.className = "px-3 py-1.5 rounded-xl font-bold bg-indigo-600 text-white shadow-sm";
-        } else {
-          btn.className = "px-3 py-1.5 rounded-xl font-bold bg-slate-800 text-slate-300 hover:text-white";
-        }
-      });
-      renderRealtimeDashboard();
-    }
-
-    function setRtCategoryFilter(catType) {
-      currentRtCategoryFilter = catType;
-      ['ALL', '대형', '소형', '자동화', '세척', '용접'].forEach(c => {
-        const btn = document.getElementById(`rtCatPill_${c}`);
-        if (!btn) return;
-        if (c === catType) {
-          btn.className = "px-3 py-1.5 rounded-xl font-bold bg-indigo-600 text-white shadow-sm";
-        } else {
-          btn.className = "px-3 py-1.5 rounded-xl font-bold bg-slate-800 text-slate-300 hover:text-white";
-        }
-      });
-      renderRealtimeDashboard();
-    }
-
-    // 모달 및 연동
-    function openMesPasteModal() { document.getElementById('mesPasteModal').classList.remove('hidden'); }
-    function closeMesPasteModal() { document.getElementById('mesPasteModal').classList.add('hidden'); }
-    function applyPastedMesSource() {
-      const src = document.getElementById('mesSourceTextArea').value.trim();
-      if (!src) return showToast('붙여넣을 내용이 없습니다.', 'error');
-      parseMesHtml(src);
-      closeMesPasteModal();
-    }
-
-    function openWorkerConfigModal() {
-      document.getElementById('workerApiUrlInput').value = workerApiUrl;
-      document.getElementById('workerConfigModal').classList.remove('hidden');
-    }
-    function closeWorkerConfigModal() { document.getElementById('workerConfigModal').classList.add('hidden'); }
-    function saveWorkerApiUrl() {
-      const val = document.getElementById('workerApiUrlInput').value.trim();
-      workerApiUrl = val;
-      localStorage.setItem('jw_mes_worker_url', val);
-      closeWorkerConfigModal();
-      showToast('Worker API 주소가 저장되었습니다.', 'success');
-      refreshMesData();
-    }
-
-    async function refreshMesData() {
-      const icon = document.getElementById('mesRefreshIcon');
-      if (icon) icon.classList.add('animate-spin');
-
-      if (workerApiUrl) {
-        try {
-          const res = await fetch(workerApiUrl);
-          const data = await res.json();
-          if (data && data.success && Array.isArray(data.items)) {
-            realtimeMesList = data.items;
-            if (data.serverTime) document.getElementById('mesServerTime').innerText = data.serverTime;
-            renderRealtimeDashboard();
-            showToast('실시간 MES 동기화 완료', 'success');
-          } else {
-            showToast('데이터 파싱 실패', 'error');
-          }
-        } catch (e) {
-          showToast('Worker 연결 에러: ' + e.message, 'error');
-        }
-      } else {
-        setTimeout(() => showToast('자동 연동 URL이 없어 기본 시드 데이터가 유지됩니다.', 'info'), 500);
-      }
-
-      if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
-    }
-
-    // ==========================================
-    // 2. 불량 집계 대시보드 로직 (기존 100% 호환)
-    // ==========================================
-    const DEFECT_KEYS = [
-      { key: 'mat', label: '소재불량(녹)' },
-      { key: 'setup', label: '셋업품' },
-      { key: 'dimSec', label: '치수확보불량품' },
-      { key: 'burr', label: 'BURR(HOLE)' },
-      { key: 'dent', label: '찍힘' },
-      { key: 'scratch', label: '스크래치(긁힘)' },
-      { key: 'dimGauge', label: '치수불량(게이지)' },
-      { key: 'shape', label: '형상불량(타각NG)' },
-      { key: 'marking', label: '마킹불량(홀누락)' }
-    ];
-
-    const STANDARD_MACHINES = [
-      { name: '대형 500톤 1호기', group: '대형프레스(TR)' },
-      { name: '대형 500톤 2호기', group: '대형프레스(TR)' },
-      { name: '대형 500톤 3호기', group: '대형프레스(TR)' },
-      { name: '대형 600톤 1호기', group: '대형프레스(TR)' },
-      { name: '대형 600톤 2호기', group: '대형프레스(TR)' },
-      { name: '대형 600톤 3호기', group: '대형프레스(TR)' },
-      { name: '대형 800톤 2호기', group: '대형프레스(TR)' },
-      { name: '대형 프레스 라인', group: '대형프레스(TR)' },
-      { name: '대형 800톤 1호기', group: '대형프레스(PR)' },
-      { name: '대형 400톤 1호기', group: '대형프레스(PR)' },
-      { name: '200T', group: '소형프레스' },
-      { name: '250T-1', group: '소형프레스' },
-      { name: '250T-2', group: '소형프레스' },
-      { name: '250T-3', group: '소형프레스' },
-      { name: '로봇2라인 (250톤)', group: '자동화 프레스' },
-      { name: '셔틀 400톤', group: '자동화 프레스' },
-      { name: '650톤 트렌스퍼 1호기', group: '자동화 프레스' }
-    ];
-
-    const ORDERED_GROUPS = ['대형프레스(TR)', '대형프레스(PR)', '소형프레스', '자동화 프레스'];
-    let weeklyDefectRecords = [];
-    let periodMode = 'weekly';
-    let selectedSubPeriod = 'ALL';
-    let selectedLineGroup = 'ALL';
-    let selectedDefectType = 'ALL';
-    let searchQuery = '';
-    let currentTableViewMode = 'pivot';
-    let trendChartInstance = null;
-    let lineChartInstance = null;
-
-    function initDefaultData() {
-      const raw37 = [
-        { machine: '대형 500톤 1호기', defects: { mat: 37, setup: 0, dimSec: 1954, burr: 0, dent: 248, scratch: 84, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 2323, lossAmount: 1268358 },
-        { machine: '대형 500톤 2호기', defects: { mat: 0, setup: 38, dimSec: 76, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 114, lossAmount: 56829 },
-        { machine: '대형 600톤 1호기', defects: { mat: 0, setup: 34, dimSec: 20, burr: 0, dent: 30, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 84, lossAmount: 34020 },
-        { machine: '대형 600톤 2호기', defects: { mat: 62, setup: 50, dimSec: 200, burr: 153, dent: 61, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 526, lossAmount: 277465 },
-        { machine: '대형 600톤 3호기', defects: { mat: 0, setup: 0, dimSec: 204, burr: 0, dent: 1011, scratch: 40, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 1255, lossAmount: 798180 },
-        { machine: '대형 800톤 1호기', defects: { mat: 8, setup: 166, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 174, lossAmount: 53737 },
-        { machine: '대형 400톤 1호기', defects: { mat: 236, setup: 135, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 371, lossAmount: 217406 },
-        { machine: '200T', defects: { mat: 0, setup: 842, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 842, lossAmount: 168400 },
-        { machine: '250T-1', defects: { mat: 118, setup: 804, dimSec: 150, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 1072, lossAmount: 214400 },
-        { machine: '250T-2', defects: { mat: 18, setup: 378, dimSec: 150, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 546, lossAmount: 109200 },
-        { machine: '로봇2라인 (250톤)', defects: { mat: 0, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 3, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 3, lossAmount: 4800 },
-        { machine: '셔틀 400톤', defects: { mat: 2, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 2, lossAmount: 3122 },
-        { machine: '650톤 트렌스퍼 1호기', defects: { mat: 13, setup: 0, dimSec: 0, burr: 0, dent: 0, scratch: 0, dimGauge: 0, shape: 0, marking: 0 }, totalQty: 13, lossAmount: 62173 }
-      ];
-
-      function buildRecords(rawList, weekCode, weekLabel, type) {
-        return rawList.map(item => {
-          const mMeta = STANDARD_MACHINES.find(m => m.name === item.machine) || { group: '대형프레스(TR)' };
-          const sumQty = item.totalQty;
-          const lossAmt = item.lossAmount;
-          return {
-            week: weekCode,
-            weekLabel: weekLabel,
-            type: type,
-            group: mMeta.group,
-            machine: item.machine,
-            defects: item.defects,
-            totalQty: sumQty,
-            lossAmount: lossAmt,
-            unitPrice: sumQty > 0 ? Math.round(lossAmt / sumQty) : 500
-          };
-        });
-      }
-
-      weeklyDefectRecords = buildRecords(raw37, '2026-W37', '37주차', 'weekly');
-    }
-
-    function initDefectCharts() {
-      const trendCtx = document.getElementById('trendTimelineChart').getContext('2d');
-      trendChartInstance = new Chart(trendCtx, {
-        type: 'bar',
-        data: {
-          labels: ['37주차'],
-          datasets: [
-            { type: 'bar', label: '불량 수량(EA)', data: [7338], backgroundColor: 'rgba(244, 63, 94, 0.85)', borderRadius: 6, yAxisID: 'yQty' },
-            { type: 'line', label: '손실액(만원)', data: [310], borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderWidth: 2, yAxisID: 'yLoss' }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            yQty: { type: 'linear', position: 'left' },
-            yLoss: { type: 'linear', position: 'right', grid: { display: false } }
-          }
-        }
-      });
-
-      const lineCtx = document.getElementById('lineComparisonChart').getContext('2d');
-      lineChartInstance = new Chart(lineCtx, {
-        type: 'bar',
-        data: {
-          labels: ORDERED_GROUPS,
-          datasets: [
-            { label: '불량 수량(EA)', data: [4902, 545, 2460, 18], backgroundColor: 'rgba(99, 102, 241, 0.85)', borderRadius: 6 }
-          ]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
-
-    function updateDefectDashboard() {
-      let totalQty = 0;
-      let totalLoss = 0;
-      const machineMap = {};
-
-      weeklyDefectRecords.forEach(item => {
-        totalQty += item.totalQty;
-        totalLoss += item.lossAmount;
-        if (!machineMap[item.machine]) machineMap[item.machine] = { qty: 0, loss: 0 };
-        machineMap[item.machine].qty += item.totalQty;
-        machineMap[item.machine].loss += item.lossAmount;
-      });
-
-      const sorted = Object.entries(machineMap).sort((a,b) => b[1].loss - a[1].loss);
-      const topM = sorted.length > 0 ? sorted[0] : ['-', {qty:0, loss:0}];
-
-      document.getElementById('kpiDefectQty').innerText = totalQty.toLocaleString();
-      document.getElementById('kpiDefectVal').innerText = Math.round(totalLoss).toLocaleString();
-      document.getElementById('kpiMachineCount').innerText = `${Object.keys(machineMap).length}대 설비 집계`;
-      document.getElementById('kpiAvgPrice').innerText = totalQty > 0 ? `평균단가: ₩${Math.round(totalLoss/totalQty).toLocaleString()}` : '₩0';
-      document.getElementById('kpiTopMachine').innerText = topM[0];
-      document.getElementById('kpiTopMachineStats').innerText = `${topM[1].qty.toLocaleString()}개 (₩${Math.round(topM[1].loss).toLocaleString()})`;
-      document.getElementById('kpiTopDefectType').innerText = '치수확보불량품';
-      document.getElementById('kpiTopDefectShare').innerText = `2,684개 (36.5%)`;
-
-      renderPivotTable();
-    }
-
-    function renderPivotTable() {
-      const thead = document.getElementById('pivotTableHeaderRow');
-      const tbody = document.getElementById('pivotTableBody');
-      const tfoot = document.getElementById('pivotTableFoot');
-
-      thead.innerHTML = `<th class="py-3 px-3 text-left w-40 bg-sky-950">설비명</th><th class="py-3 px-3 text-center w-28 bg-sky-900">라인 구분</th><th class="py-3 px-2 text-center bg-rose-700">37주차 (수량 | 금액)</th><th class="py-3 px-3 text-center bg-amber-400 text-rose-950 font-extrabold">누적 수량</th><th class="py-3 px-3 text-right bg-amber-400 text-rose-950 font-extrabold">총 손실금액</th>`;
-
-      let totalQ = 0, totalL = 0;
-      tbody.innerHTML = weeklyDefectRecords.map(r => {
-        totalQ += r.totalQty;
-        totalL += r.lossAmount;
-        return `
-          <tr class="hover:bg-slate-50">
-            <td class="py-2 px-3 font-bold text-slate-900">${r.machine}</td>
-            <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded text-[11px] bg-slate-100 font-semibold">${r.group}</span></td>
-            <td class="py-2 px-2 text-center font-mono text-[11px] bg-amber-50/40 font-bold">${r.totalQty.toLocaleString()} / ₩${r.lossAmount.toLocaleString()}</td>
-            <td class="py-2 px-3 text-center font-mono font-bold text-rose-700 bg-rose-50/60">${r.totalQty.toLocaleString()}</td>
-            <td class="py-2 px-3 text-right font-mono font-bold text-rose-800 bg-rose-50/40">₩${r.lossAmount.toLocaleString()}</td>
-          </tr>
-        `;
-      }).join('');
-
-      tfoot.innerHTML = `<tr><td colspan="2" class="py-3 px-4 text-center font-bold bg-slate-300">합계</td><td class="py-3 px-2 text-center font-mono font-bold">${totalQ.toLocaleString()} / ₩${totalL.toLocaleString()}</td><td class="py-3 px-3 text-center font-extrabold text-rose-800 bg-rose-200">${totalQ.toLocaleString()}</td><td class="py-3 px-3 text-right font-extrabold text-rose-900 bg-rose-200">₩${totalL.toLocaleString()}</td></tr>`;
-      document.getElementById('tableRecordCountBadge').innerText = `${weeklyDefectRecords.length}건`;
-    }
-
-    function setTableViewMode(m) {
-      if (m === 'pivot') {
-        document.getElementById('pivotViewContainer').classList.remove('hidden');
-        document.getElementById('detailedViewContainer').classList.add('hidden');
-        document.getElementById('btnViewPivot').className = "px-3 py-1 rounded-lg bg-rose-600 text-white font-bold";
-        document.getElementById('btnViewDetailed').className = "px-3 py-1 rounded-lg text-slate-600";
-      } else {
-        document.getElementById('pivotViewContainer').classList.add('hidden');
-        document.getElementById('detailedViewContainer').classList.remove('hidden');
-        document.getElementById('btnViewPivot').className = "px-3 py-1 rounded-lg text-slate-600";
-        document.getElementById('btnViewDetailed').className = "px-3 py-1 rounded-lg bg-rose-600 text-white font-bold";
-      }
-    }
-
-    function openPasteModal() { document.getElementById('pasteModal').classList.remove('hidden'); }
-    function closePasteModal() { document.getElementById('pasteModal').classList.add('hidden'); }
-    function processPastedDefectText() { closePasteModal(); showToast('데이터 반영 완료', 'success'); }
-    function exportToExcel() { showToast('엑셀 파일 다운로드 완료', 'success'); }
-    function setPeriodMode(m) {}
-    function handlePeriodFilterChange() {}
-    function applyFilters() {}
-    function resetAllFilters() {}
-
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      document.getElementById('toastMessage').innerText = msg;
-      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
-      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
-    }
-
-    // ==========================================
-    // 3. 초기화 진입
-    // ==========================================
-    window.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-
-      // 세션 확인
-      if (sessionStorage.getItem('_db_access_auth_') === 'granted') {
-        document.getElementById('securityLockModal').classList.add('hidden');
-        document.getElementById('mainDashboardApp').classList.remove('blur-sm', 'pointer-events-none');
-      }
-
-      // 1. 실시간 MES 데이터 파싱
-      parseMesHtml(DEFAULT_MES_HTML);
-
-      // 2. 불량 데이터 및 차트 초기화
-      initDefaultData();
-      initDefectCharts();
-      updateDefectDashboard();
-
-      // 3. Worker 자동 연동 주소가 있으면 백그라운드 갱신
-      if (workerApiUrl) {
-        refreshMesData();
-        // 30초 주기 자동 갱신
-        setInterval(refreshMesData, 30000);
-      }
-    });
-  </script>
-  <script src="plan.js" charset="utf-8"></script>
-</body>
-</html>
+          worker: worker
