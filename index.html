@@ -121,7 +121,7 @@
     }
 
     @media print {
-      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar {
+      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar, footer {
         display: none !important;
       }
       body { background-color: #ffffff !important; font-size: 10pt; color: #000; }
@@ -131,7 +131,7 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased bg-slate-950 text-slate-100">
 
-  <!-- ================= 포털 전체 컨테이너 (비밀번호 잠금 없이 바로 로드) ================= -->
+  <!-- ================= 포털 전체 컨테이너 ================= -->
   <div id="mainDashboardApp" class="flex-1 flex flex-col transition-all duration-300 min-h-screen">
     
     <!-- 글로벌 탑 네비게이션 헤더 -->
@@ -151,7 +151,7 @@
 
         <!-- 탭 네비게이션: v8 LIVE 스타일 알약(Pill) 배지 그룹 -->
         <nav class="nav-badge-group">
-          <!-- v8 LIVE 배지 -->
+          <!-- v8 LIVE 배지 (시스템 버전 및 동작 표시기) -->
           <span class="badge-pill bg-rose-500/15 border-rose-500/40 text-rose-300">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-400 badge-pulse"></span>
             <span>v8 LIVE</span>
@@ -649,6 +649,30 @@
         </div>
       </div>
     </main>
+
+    <!-- ================= 하단 푸터 (모바일 2줄 초간소화 적용) ================= -->
+    <footer class="mt-auto border-t border-slate-800/80 bg-slate-950/90 py-4 sm:py-6 px-3 text-center text-[11px] sm:text-xs text-slate-500 space-y-1.5 sm:space-y-2 no-print">
+      <!-- 1. 회사명 및 공식 주소 (모바일에서는 숨김, PC 화면 sm: 이상에서만 표시) -->
+      <div class="hidden sm:flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-slate-400">
+        <span class="font-bold text-slate-300">(주)전우정밀</span>
+        <span class="text-slate-700">|</span>
+        <span>경상북도 경산시 진량읍 공단8로 24</span>
+        <span class="text-slate-700">|</span>
+        <span>TEL. 053-859-5400</span>
+      </div>
+
+      <!-- 2. 시스템 문의처 & 관리자 연락처 (모바일: 첫 번째 줄) -->
+      <div class="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-slate-300 font-medium">
+        <span>시스템 문의: <a href="mailto:mamanager8@jwjm.com" class="text-slate-400 hover:text-emerald-400 underline decoration-slate-600 transition-colors">mamanager8@jwjm.com</a></span>
+        <span class="text-slate-700">|</span>
+        <span>관리자: <a href="tel:01047016665" class="text-slate-400 hover:text-emerald-400 font-mono transition-colors">010-4701-6665</a></span>
+      </div>
+
+      <!-- 3. 카피라이트 (모바일: 두 번째 줄) -->
+      <p class="text-[10px] sm:text-[11px] text-slate-600 pt-0.5">
+        Copyright © (주)전우정밀 JEONWOO. All Rights Reserved.
+      </p>
+    </footer>
 
   </div>
 
