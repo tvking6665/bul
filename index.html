@@ -102,6 +102,7 @@
       color: #ffffff;
     }
 
+    /* 플로팅 줌 툴바: 모바일 화면 간섭 방지를 위해 sm(태블릿/PC) 이상에서만 활성화 */
     .zoom-toolbar {
       position: fixed;
       bottom: 24px;
@@ -132,7 +133,7 @@
     }
 
     @media print {
-      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar, footer, #pwaInstallBanner {
+      header, nav, #fileDropBanner, #filterToolbarSection, .no-print, .action-column, .zoom-toolbar, footer {
         display: none !important;
       }
       body { background-color: #ffffff !important; font-size: 10pt; color: #000; }
@@ -160,8 +161,14 @@
           </svg>
         </div>
 
-        <!-- 탭 네비게이션 -->
+        <!-- 탭 네비게이션: 헤더 상단에 바로가기 앱 설치 버튼 배치 -->
         <nav class="nav-badge-group">
+          <!-- 상단 전용 앱 설치 버튼 -->
+          <button id="headerInstallBtn" onclick="triggerAppInstall()" class="badge-pill bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>앱 설치</span>
+          </button>
+
           <span class="badge-pill bg-rose-500/15 border-rose-500/40 text-rose-300">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-400 badge-pulse"></span>
             <span>v8 LIVE</span>
@@ -277,7 +284,7 @@
     <!-- ================= 2. 실시간 설비 가동 현황판 ================= -->
     <main id="viewRealtime" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-950">
       
-      <!-- 상단 컨트롤 바 (사용자 화면에서 주소 설정 버튼 완전 삭제됨) -->
+      <!-- 상단 컨트롤 바 -->
       <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
@@ -674,24 +681,8 @@
 
   </div>
 
-  <!-- ================= 원클릭 바로가기 앱 설치 배너 ================= -->
-  <div id="pwaInstallBanner" class="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-84 z-50 bg-slate-900/95 border border-emerald-500/60 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3">
-    <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center font-black text-blue-700 italic text-sm shrink-0 shadow">
-        JW
-      </div>
-      <div>
-        <h4 class="text-xs font-bold text-white">JW 생산현황 앱</h4>
-        <p class="text-[10px] text-slate-400 leading-tight">바탕화면에 바로가기 추가</p>
-      </div>
-    </div>
-    <button id="pwaInstallBtn" onclick="triggerAppInstall()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-md transition-all">
-      설치하기
-    </button>
-  </div>
-
-  <!-- ================= 플로팅 화면 배율 컨트롤러 ================= -->
-  <div class="zoom-toolbar">
+  <!-- ================= 플로팅 화면 배율 컨트롤러 (모바일 간섭 방지: sm 이상 PC 화면에서만 표시) ================= -->
+  <div class="zoom-toolbar hidden sm:flex">
     <button type="button" class="zoom-btn" onclick="zoomChange(0.1)" title="확대">+</button>
     <button type="button" class="zoom-btn" onclick="zoomChange(-0.1)" title="축소">−</button>
     <button type="button" class="zoom-btn" onclick="zoomReset()" style="font-size: 11px;">100%</button>
@@ -770,7 +761,12 @@
 
   <!-- ================= 스크립트 로직 ================= -->
   <script>
-    // 0. 관리자 고정 Worker API 주소 정의
+    // 0. 서비스 워커 등록 (PWA 설치 인식 활성화)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    // 관리자 고정 Worker API 주소 정의
     const HARDCODED_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
 
     // 잘못 저장된 bul.kim6665.workers.dev 주소 강제 교정 및 고정값 적용
@@ -851,14 +847,20 @@
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
           if (choiceResult.outcome === 'accepted') {
-            document.getElementById('pwaInstallBanner').style.display = 'none';
+            showToast('앱 설치가 진행됩니다.', 'success');
           }
           deferredPrompt = null;
         });
       } else {
-        alert("브라우저 우측 상단 메뉴(⋮ 또는 ≡)를 누른 후\n['홈 화면에 추가'] 또는 ['앱 설치']를 눌러주세요.");
+        alert("브라우저 오른쪽 위 점 3개(⋮) 또는 줄 3개(≡) 메뉴를 누르고\n['홈 화면에 추가'] 또는 ['앱 설치']를 눌러주세요.");
       }
     }
+
+    window.addEventListener('appinstalled', () => {
+      const btn = document.getElementById('headerInstallBtn');
+      if (btn) btn.style.display = 'none';
+      showToast('JW 생산현황 앱이 설치되었습니다.', 'success');
+    });
 
     // 2. 화면 전환 함수
     function switchDashboardView(viewName) {
