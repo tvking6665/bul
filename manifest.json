@@ -1,0 +1,15 @@
+{
+  "name": "JW 프레스 생산 가동 현황",
+  "short_name": "JW 생산현황",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
