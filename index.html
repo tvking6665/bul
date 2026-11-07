@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <!-- 모바일 핀치 줌(확대/축소) 허용 메타태그 -->
+  <!-- 모바일 핀치 줌 허용 메타태그 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes" />
   <title>JW 프레스 생산 가동 현황</title>
 
@@ -149,9 +149,9 @@
     <header class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md no-print">
       <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         
-        <!-- 투명화된 JW JEONWOO 로고 -->
-        <div class="flex items-center space-x-2.5 cursor-pointer shrink-0" onclick="switchDashboardView('cover')" title="(주)전우정밀 메인으로 이동">
-          <svg class="h-7 sm:h-8 w-auto" viewBox="0 0 170 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- JW JEONWOO 로고 (관리자 히든 진입 트리거: 5번 연속 클릭 시 관리자 모드) -->
+        <div class="flex items-center space-x-2.5 cursor-pointer shrink-0" onclick="handleLogoSecretClick()" title="(주)전우정밀 메인으로 이동">
+          <svg class="h-7 sm:h-8 w-auto pointer-events-none" viewBox="0 0 170 38" fill="none" xmlns="http://www.w3.org/2000/svg">
             <ellipse cx="26" cy="19" rx="24" ry="17" fill="#FACC15" />
             <path d="M 26 3 A 22 15 0 0 0 6 19 A 22 15 0 0 0 26 35 Z" fill="#22C55E" />
             <path d="M 26 3 A 22 15 0 0 1 46 19 A 22 15 0 0 1 26 35 Z" fill="#1D4ED8" />
@@ -160,7 +160,7 @@
           </svg>
         </div>
 
-        <!-- 탭 네비게이션: v8 LIVE 스타일 알약(Pill) 배지 그룹 -->
+        <!-- 탭 네비게이션 -->
         <nav class="nav-badge-group">
           <span class="badge-pill bg-rose-500/15 border-rose-500/40 text-rose-300">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-400 badge-pulse"></span>
@@ -190,7 +190,7 @@
       </div>
     </header>
 
-    <!-- ================= 1. PPT 스타일 메인 허브 표지 (Cover View) ================= -->
+    <!-- ================= 1. PPT 스타일 메인 허브 표지 ================= -->
     <section id="viewCover" class="relative flex-1 flex flex-col justify-center items-center px-4 py-12 w-full min-h-[calc(100vh-4rem)] bg-cover bg-center bg-no-repeat" style="background-image: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.94)), url('bg.jpg');">
       <div class="text-center space-y-4 max-w-3xl z-10">
         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-xs font-bold text-sky-400 shadow-lg backdrop-blur-md">
@@ -210,7 +210,7 @@
         </p>
       </div>
 
-      <!-- 3대 모듈 선택 카드 그리드 -->
+      <!-- 3대 모듈 선택 카드 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mt-12 z-10 px-2">
         <!-- 카드 1: 실시간 설비 모니터링 -->
         <div onclick="switchDashboardView('realtime')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
@@ -277,7 +277,7 @@
     <!-- ================= 2. 실시간 설비 가동 현황판 ================= -->
     <main id="viewRealtime" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-950">
       
-      <!-- 상단 컨트롤 바 -->
+      <!-- 상단 컨트롤 바 (사용자 화면에서 주소 설정 버튼 완전 삭제됨) -->
       <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
@@ -289,16 +289,13 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button onclick="openWorkerConfigModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors" title="Cloudflare Worker 프록시 주소 설정">
-            <i data-lucide="cloud" class="w-4 h-4 text-sky-400"></i>
-            <span>Worker 자동연동 설정</span>
-          </button>
-
+          <!-- 비상용 직접 붙여넣기 갱신 버튼 -->
           <button onclick="openMesPasteModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
             <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
-            <span>MES HTML/텍스트 붙여넣기</span>
+            <span>MES HTML/텍스트 수동 반영</span>
           </button>
 
+          <!-- 새로고침 버튼 -->
           <button onclick="refreshMesData()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors" title="데이터 새로고침">
             <i data-lucide="refresh-cw" class="w-4 h-4" id="mesRefreshIcon"></i>
           </button>
@@ -654,7 +651,7 @@
       </div>
     </main>
 
-    <!-- ================= 하단 푸터 (모바일 2줄 간소화) ================= -->
+    <!-- ================= 하단 푸터 ================= -->
     <footer class="mt-auto border-t border-slate-800/80 bg-slate-950/90 py-4 sm:py-6 px-3 text-center text-[11px] sm:text-xs text-slate-500 space-y-1.5 sm:space-y-2 no-print">
       <div class="hidden sm:flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-slate-400">
         <span class="font-bold text-slate-300">(주)전우정밀</span>
@@ -678,15 +675,17 @@
   </div>
 
   <!-- ================= 원클릭 바로가기 앱 설치 배너 ================= -->
-  <div id="pwaInstallBanner" class="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 z-50 bg-slate-900/95 border border-emerald-500/60 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 hidden">
+  <div id="pwaInstallBanner" class="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-84 z-50 bg-slate-900/95 border border-emerald-500/60 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3">
     <div class="flex items-center gap-2.5">
-      <img src="icon.png" alt="JW" class="w-9 h-9 rounded-xl object-contain border border-slate-700 shrink-0" onerror="this.src='https://placehold.co/100x100/10b981/ffffff?text=JW'" />
+      <div class="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center font-black text-blue-700 italic text-sm shrink-0 shadow">
+        JW
+      </div>
       <div>
         <h4 class="text-xs font-bold text-white">JW 생산현황 앱</h4>
         <p class="text-[10px] text-slate-400 leading-tight">바탕화면에 바로가기 추가</p>
       </div>
     </div>
-    <button id="pwaInstallBtn" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-md transition-all">
+    <button id="pwaInstallBtn" onclick="triggerAppInstall()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-md transition-all">
       설치하기
     </button>
   </div>
@@ -698,7 +697,32 @@
     <button type="button" class="zoom-btn" onclick="zoomReset()" style="font-size: 11px;">100%</button>
   </div>
 
-  <!-- 모달 1: MES HTML 붙여넣기 모달 -->
+  <!-- ================= 관리자 전용 Worker 주소 변경 모달 (히든 트리거) ================= -->
+  <div id="workerConfigModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-rose-400"></i> [관리자 전용] Worker API 주소 관리
+        </h3>
+        <button onclick="closeWorkerConfigModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        중계 프로그램 PC 또는 Worker 주소를 변경할 때만 입력하세요. 일반 사용자에게는 노출되지 않습니다.
+      </p>
+      <input type="text" id="workerApiUrlInput" class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono" />
+      <div class="flex justify-between items-center pt-2">
+        <button onclick="resetWorkerApiUrl()" class="text-xs text-rose-400 hover:underline">기본값으로 복구</button>
+        <div class="flex gap-2">
+          <button onclick="closeWorkerConfigModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">취소</button>
+          <button onclick="saveWorkerApiUrl()" class="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white">저장 및 즉시 동기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 모달: MES HTML 붙여넣기 모달 -->
   <div id="mesPasteModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -720,29 +744,7 @@
     </div>
   </div>
 
-  <!-- 모달 2: Worker 자동 연동 URL 설정 모달 -->
-  <div id="workerConfigModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl p-6 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <i data-lucide="cloud" class="w-5 h-5 text-sky-400"></i> Cloudflare Worker API URL 연결
-        </h3>
-        <button onclick="closeWorkerConfigModal()" class="text-slate-400 hover:text-white p-1">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-      <p class="text-xs text-slate-400 leading-relaxed">
-        배포해 둔 Cloudflare Worker 중계 주소를 등록하면 30초마다 자동으로 사내 MES를 호출하여 화면을 갱신합니다.
-      </p>
-      <input type="text" id="workerApiUrlInput" placeholder="예: https://floral-wood-cc25.kim6665.workers.dev" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none" />
-      <div class="flex justify-end gap-2 pt-2">
-        <button onclick="closeWorkerConfigModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">취소</button>
-        <button onclick="saveWorkerApiUrl()" class="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white">저장 및 자동 동기화</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 모달 3: 불량 데이터 엑셀 붙여넣기 모달 -->
+  <!-- 모달: 불량 데이터 엑셀 붙여넣기 모달 -->
   <div id="pasteModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-2xl border border-slate-200 shadow-2xl p-6 space-y-3 text-slate-800">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -768,45 +770,97 @@
 
   <!-- ================= 스크립트 로직 ================= -->
   <script>
-    // 0. 카카오톡 인앱 브라우저 탈출 (크롬/삼성인터넷 브라우저로 자동 열기)
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('kakaotalk')) {
-      const targetUrl = window.location.href.replace(/https?:\/\//i, '');
-      window.location.href = 'intent://' + targetUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+    // 0. 관리자 고정 Worker API 주소 정의
+    const HARDCODED_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
+
+    // 잘못 저장된 bul.kim6665.workers.dev 주소 강제 교정 및 고정값 적용
+    let storedUrl = localStorage.getItem('jw_mes_worker_url');
+    if (!storedUrl || storedUrl.includes('bul.kim6665.workers.dev')) {
+      storedUrl = HARDCODED_WORKER_URL;
+      localStorage.setItem('jw_mes_worker_url', HARDCODED_WORKER_URL);
+    }
+    let workerApiUrl = storedUrl;
+
+    // 관리자 히든 트리거 (로고 5회 클릭 시 인증 후 모달 오픈)
+    let secretClickCount = 0;
+    let secretClickTimer = null;
+    function handleLogoSecretClick() {
+      secretClickCount++;
+      clearTimeout(secretClickTimer);
+      secretClickTimer = setTimeout(() => { secretClickCount = 0; }, 2000);
+
+      if (secretClickCount >= 5) {
+        secretClickCount = 0;
+        const pass = prompt('관리자 암호를 입력하세요:');
+        if (pass === '7777') {
+          openWorkerConfigModal();
+        } else if (pass !== null) {
+          alert('암호가 올바르지 않습니다.');
+        }
+      } else {
+        switchDashboardView('cover');
+      }
     }
 
-    // 1. PWA 설치 이벤트 제어
+    // 단축키 관리자 모드: Ctrl + Alt + M
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'm') {
+        const pass = prompt('관리자 암호를 입력하세요:');
+        if (pass === '7777') openWorkerConfigModal();
+      }
+    });
+
+    function openWorkerConfigModal() {
+      document.getElementById('workerApiUrlInput').value = workerApiUrl;
+      document.getElementById('workerConfigModal').classList.remove('hidden');
+    }
+    function closeWorkerConfigModal() {
+      document.getElementById('workerConfigModal').classList.add('hidden');
+    }
+    function saveWorkerApiUrl() {
+      const val = document.getElementById('workerApiUrlInput').value.trim();
+      workerApiUrl = val || HARDCODED_WORKER_URL;
+      localStorage.setItem('jw_mes_worker_url', workerApiUrl);
+      closeWorkerConfigModal();
+      showToast('Worker API 주소가 변경되었습니다.', 'success');
+      refreshMesData();
+    }
+    function resetWorkerApiUrl() {
+      workerApiUrl = HARDCODED_WORKER_URL;
+      document.getElementById('workerApiUrlInput').value = HARDCODED_WORKER_URL;
+      localStorage.setItem('jw_mes_worker_url', HARDCODED_WORKER_URL);
+      showToast('기본 주소로 초기화되었습니다.', 'info');
+    }
+
+    // 1. 카카오톡 인앱 탈출 및 PWA 설치 이벤트
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const banner = document.getElementById('pwaInstallBanner');
-      if (banner) banner.classList.remove('hidden');
     });
 
-    const installBtn = document.getElementById('pwaInstallBtn');
-    if (installBtn) {
-      installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          if (outcome === 'accepted') {
-            const banner = document.getElementById('pwaInstallBanner');
-            if (banner) banner.classList.add('hidden');
+    function triggerAppInstall() {
+      const isKakao = navigator.userAgent.toLowerCase().includes('kakaotalk');
+      if (isKakao) {
+        const targetUrl = window.location.href.replace(/https?:\/\//i, '');
+        window.location.href = 'intent://' + targetUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+        return;
+      }
+
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            document.getElementById('pwaInstallBanner').style.display = 'none';
           }
           deferredPrompt = null;
-        } else {
-          alert('브라우저 메뉴(⋮)에서 [홈 화면에 추가] 또는 [앱 설치]를 선택해 주세요.');
-        }
-      });
+        });
+      } else {
+        alert("브라우저 우측 상단 메뉴(⋮ 또는 ≡)를 누른 후\n['홈 화면에 추가'] 또는 ['앱 설치']를 눌러주세요.");
+      }
     }
 
-    window.addEventListener('appinstalled', () => {
-      const banner = document.getElementById('pwaInstallBanner');
-      if (banner) banner.classList.add('hidden');
-    });
-
-    // 화면 전환
+    // 2. 화면 전환 함수
     function switchDashboardView(viewName) {
       const views = ['viewCover', 'viewRealtime', 'viewDefect', 'viewPlan'];
       views.forEach(v => {
@@ -845,12 +899,10 @@
       lucide.createIcons();
     }
 
-    // MES 실시간 모니터링 엔진
+    // 3. 실시간 MES 모니터링 로직
     let realtimeMesList = [];
     let currentRtFilter = 'ALL';
     let currentRtCategoryFilter = 'ALL';
-    const DEFAULT_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
-    let workerApiUrl = localStorage.getItem('jw_mes_worker_url') || DEFAULT_WORKER_URL;
 
     function getMachineCategory(item) {
       if (item.category && item.category !== '기타') return item.category;
@@ -1021,20 +1073,6 @@
       if (!src) return showToast('붙여넣을 내용이 없습니다.', 'error');
       parseMesHtml(src);
       closeMesPasteModal();
-    }
-
-    function openWorkerConfigModal() {
-      document.getElementById('workerApiUrlInput').value = workerApiUrl;
-      document.getElementById('workerConfigModal').classList.remove('hidden');
-    }
-    function closeWorkerConfigModal() { document.getElementById('workerConfigModal').classList.add('hidden'); }
-    function saveWorkerApiUrl() {
-      const val = document.getElementById('workerApiUrlInput').value.trim();
-      workerApiUrl = val || DEFAULT_WORKER_URL;
-      localStorage.setItem('jw_mes_worker_url', workerApiUrl);
-      closeWorkerConfigModal();
-      showToast('Worker API 주소가 저장되었습니다.', 'success');
-      refreshMesData();
     }
 
     async function refreshMesData() {
@@ -1270,7 +1308,7 @@
       setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
     }
 
-    // 초기화
+    // 초기화 진입
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       parseMesHtml(DEFAULT_MES_HTML);
@@ -1278,6 +1316,7 @@
       initDefectCharts();
       updateDefectDashboard();
 
+      // 지정된 백엔드 Worker로 즉시 자동 동기화 시작 (30초 주기)
       if (workerApiUrl) {
         refreshMesData();
         setInterval(refreshMesData, 30000);
