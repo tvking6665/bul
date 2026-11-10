@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <!-- 모바일 핀치 줌 허용 메타태그 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes" />
-  <title>JW 프레스 생산 가동 현황</title>
+  <title>JW 프레스 생산 가동 현황 & 3D 공장동 관제</title>
 
   <!-- ================= 카카오톡 링크 공유 미리보기 (Open Graph) ================= -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="JW 프레스 생산 가동 현황" />
+  <meta property="og:title" content="JW 프레스 생산 가동 현황 & 3D 관제" />
   <meta property="og:description" content="터치하여 휴대폰 바탕화면에 전용 앱을 설치하세요." />
   <meta property="og:image" content="icon.png" />
 
@@ -28,6 +28,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Three.js Import Map (GitHub 모듈 연동용) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 
   <!-- Google Fonts: Noto Sans KR -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,7 +112,29 @@
       color: #ffffff;
     }
 
-    /* 플로팅 줌 툴바: 모바일 화면 간섭 방지를 위해 sm(태블릿/PC) 이상에서만 활성화 */
+    /* 3D 뷰어 전용 스타일 */
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .view-3d-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(18, 22, 32, 0.94);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #f1f5f9;
+      min-width: 320px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 30;
+    }
+
     .zoom-toolbar {
       position: fixed;
       bottom: 24px;
@@ -150,7 +182,7 @@
     <header class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md no-print">
       <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         
-        <!-- JW JEONWOO 로고 (관리자 히든 진입 트리거: 5번 연속 클릭 시 관리자 모드) -->
+        <!-- JW JEONWOO 로고 -->
         <div class="flex items-center space-x-2.5 cursor-pointer shrink-0" onclick="handleLogoSecretClick()" title="(주)전우정밀 메인으로 이동">
           <svg class="h-7 sm:h-8 w-auto pointer-events-none" viewBox="0 0 170 38" fill="none" xmlns="http://www.w3.org/2000/svg">
             <ellipse cx="26" cy="19" rx="24" ry="17" fill="#FACC15" />
@@ -161,9 +193,8 @@
           </svg>
         </div>
 
-        <!-- 탭 네비게이션: 헤더 상단에 바로가기 앱 설치 버튼 배치 -->
+        <!-- 탭 네비게이션: 3D 동기화라인 탭 신규 추가 -->
         <nav class="nav-badge-group">
-          <!-- 상단 전용 앱 설치 버튼 -->
           <button id="headerInstallBtn" onclick="triggerAppInstall()" class="badge-pill bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md">
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span>앱 설치</span>
@@ -182,6 +213,13 @@
           <button onclick="switchDashboardView('realtime')" id="navTabRealtime" class="badge-pill">
             <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse shadow-[0_0_6px_#34d399]"></span>
             <span>가동현황</span>
+          </button>
+
+          <!-- ★ [신규 추가] 3D 공장동 관제 탭 버튼 -->
+          <button onclick="switchDashboardView('factory3d')" id="navTabFactory3d" class="badge-pill hover:border-sky-400 hover:text-sky-300">
+            <span class="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]"></span>
+            <i data-lucide="box" class="w-3.5 h-3.5 text-sky-400"></i>
+            <span>3D 동기화라인</span>
           </button>
 
           <button onclick="switchDashboardView('defect')" id="navTabDefect" class="badge-pill">
@@ -209,16 +247,16 @@
         <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
           통합 제조 운영 현황<br>
           <span class="bg-gradient-to-r from-rose-400 via-amber-300 to-indigo-400 bg-clip-text text-transparent">
-            실시간 모니터링 & 분석 포털
+            실시간 모니터링 & 3D 관제 포털
           </span>
         </h1>
         <p class="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl mx-auto drop-shadow">
-          사내 MES 실시간 설비 가동 상태 추적, 주간·월간 설비별 불량 손실 분석, 일일 생산 진도율을 한 화면에서 체계적으로 관리합니다.
+          사내 MES 실시간 설비 가동 상태 추적, HIM 650T 6대 동기화 라인 3D 디지털 트윈, 주간·월간 설비별 불량 손실 분석을 체계적으로 관리합니다.
         </p>
       </div>
 
-      <!-- 3대 모듈 선택 카드 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mt-12 z-10 px-2">
+      <!-- 4대 모듈 카드 선택 그리드 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-7xl mt-12 z-10 px-2">
         <!-- 카드 1: 실시간 설비 모니터링 -->
         <div onclick="switchDashboardView('realtime')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
           <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
@@ -230,7 +268,7 @@
               <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse"></span>
               <span class="text-xs font-bold text-emerald-400">MES LIVE CONNECT</span>
             </div>
-            <h3 class="text-xl font-bold text-white group-hover:text-emerald-300 transition-colors">실시간 설비 모니터링</h3>
+            <h3 class="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors">실시간 설비 모니터링</h3>
             <p class="text-xs text-slate-400 mt-2 leading-relaxed">
               사내 MES(bang.asp)와 실시간 연동되어 프레스 설비별 운전 상태, 작업자, 품목 및 생산량을 즉시 확인합니다.
             </p>
@@ -241,7 +279,29 @@
           </div>
         </div>
 
-        <!-- 카드 2: 불량 집계 및 손실 분석 -->
+        <!-- ★ 카드 2: 3D 동기화라인 관제 (신규 추가) -->
+        <div onclick="switchDashboardView('factory3d')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
+          <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl group-hover:bg-sky-500/20 transition-all"></div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="box" class="w-6 h-6"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+              <span class="text-xs font-bold text-sky-400">3D DIGITAL TWIN</span>
+            </div>
+            <h3 class="text-lg font-bold text-white group-hover:text-sky-300 transition-colors">650T 동기화 라인</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              HIM 650T 6대, 400T 코일 블랭킹, 매거진 실린더/리프터 및 물류 지게차를 실시간 3D로 관제합니다.
+            </p>
+          </div>
+          <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-sky-400">
+            <span>3D 맵 열기</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+          </div>
+        </div>
+
+        <!-- 카드 3: 불량 집계 및 손실 분석 -->
         <div onclick="switchDashboardView('defect')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
           <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
           <div>
@@ -249,9 +309,9 @@
               <i data-lucide="alert-octagon" class="w-6 h-6"></i>
             </div>
             <span class="text-xs font-bold text-rose-400 mb-1.5 block">품질 및 원가 분석</span>
-            <h3 class="text-xl font-bold text-white group-hover:text-rose-300 transition-colors">설비별 불량·손실 대시보드</h3>
+            <h3 class="text-lg font-bold text-white group-hover:text-rose-300 transition-colors">불량·손실 대시보드</h3>
             <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-              설비별 주차·월간 9대 불량유형 집계, 누적 손실금액 피벗 비교 및 엑셀 데이터 즉시 동기화 기능을 제공합니다.
+              설비별 주차·월간 9대 불량유형 집계, 누적 손실금액 피벗 비교 및 엑셀 데이터 동기화 기능을 제공합니다.
             </p>
           </div>
           <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-rose-400">
@@ -260,7 +320,7 @@
           </div>
         </div>
 
-        <!-- 카드 3: 생산 계획 및 가동 현황 -->
+        <!-- 카드 4: 생산 계획 및 가동 현황 -->
         <div onclick="switchDashboardView('plan')" class="group cursor-pointer bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden flex flex-col justify-between">
           <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
           <div>
@@ -268,9 +328,9 @@
               <i data-lucide="calendar-check-2" class="w-6 h-6"></i>
             </div>
             <span class="text-xs font-bold text-amber-400 mb-1.5 block">생산관리 및 공정 진도</span>
-            <h3 class="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">생산 계획 및 가동 현황</h3>
+            <h3 class="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">생산 계획 및 가동 현황</h3>
             <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-              일일 프레스 라인별 지시 계획 수량, 실적 달성률, 종합설비효율(OEE) 진도율을 직관적으로 비교·추적합니다.
+              일일 프레스 라인별 지시 계획 수량, 실적 달성률, 종합설비효율(OEE) 진도율을 직관적으로 추적합니다.
             </p>
           </div>
           <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-400">
@@ -281,10 +341,51 @@
       </div>
     </section>
 
+    <!-- ================= ★ [신규 내장] 3D 공장동 관제 뷰어 ================= -->
+    <main id="viewFactory3d" class="hidden flex-1 w-full relative min-h-[calc(100vh-4rem)] bg-slate-950 overflow-hidden">
+      <!-- Three.js 3D 렌더링 캔버스 영역 -->
+      <div id="canvas-container"></div>
+
+      <!-- 좌측 상단 플로팅 3D 관제 오버레이 -->
+      <div class="view-3d-panel">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-2 mb-3">
+          <span class="text-sm font-bold text-sky-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse"></span>
+            (주)전우정밀 3D 디지털 트윈
+          </span>
+          <span id="lineStatusBadge" class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-600 text-white">가동 중</span>
+        </div>
+        
+        <div class="space-y-1.5 text-xs text-slate-300">
+          <div class="flex justify-between">
+            <span class="text-slate-400">트랜스퍼 6대 라인:</span>
+            <span class="font-bold text-emerald-400">HIM 650T 동기 운전 (18 SPM)</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">코일 블랭킹 프레스:</span>
+            <span class="font-bold text-sky-400">HIM 400T 연속 타발 (24 SPM)</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">순환 물류 상태:</span>
+            <span class="font-bold text-amber-400">400T 푸셔 & 650T 리프터</span>
+          </div>
+        </div>
+
+        <!-- 카메라 시점 원클릭 이동 프리셋 -->
+        <div class="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-slate-800">
+          <button id="btnViewAll" class="py-1.5 px-2 bg-slate-800 hover:bg-sky-600 text-[11px] font-bold text-white rounded-lg transition-colors">전경 전체</button>
+          <button id="btnViewFeeder" class="py-1.5 px-2 bg-slate-800 hover:bg-sky-600 text-[11px] font-bold text-white rounded-lg transition-colors">1호기 판넬</button>
+          <button id="btnViewForklift" class="py-1.5 px-2 bg-slate-800 hover:bg-sky-600 text-[11px] font-bold text-white rounded-lg transition-colors">지게차 후진</button>
+        </div>
+
+        <button id="btnToggleLineAnim" class="w-full mt-2.5 py-1.5 bg-slate-800 hover:bg-rose-600 text-xs font-bold text-white rounded-lg transition-colors">
+          3D 가동 일시정지
+        </button>
+      </div>
+    </main>
+
     <!-- ================= 2. 실시간 설비 가동 현황판 ================= -->
     <main id="viewRealtime" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-950">
-      
-      <!-- 상단 컨트롤 바 -->
       <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
@@ -296,20 +397,16 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <!-- 비상용 직접 붙여넣기 갱신 버튼 -->
           <button onclick="openMesPasteModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
             <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
             <span>MES HTML/텍스트 수동 반영</span>
           </button>
-
-          <!-- 새로고침 버튼 -->
           <button onclick="refreshMesData()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors" title="데이터 새로고침">
             <i data-lucide="refresh-cw" class="w-4 h-4" id="mesRefreshIcon"></i>
           </button>
         </div>
       </div>
 
-      <!-- 실시간 KPI 요약 카드 -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
           <div class="flex items-center justify-between text-xs text-slate-400 font-semibold">
@@ -366,7 +463,6 @@
         </div>
       </div>
 
-      <!-- 실시간 이중 필터 -->
       <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
         <div class="flex items-center gap-2 overflow-x-auto pb-0.5 text-xs">
           <span class="text-slate-400 font-bold shrink-0 w-16">상태 필터:</span>
@@ -391,13 +487,11 @@
         </div>
       </div>
 
-      <!-- 설비별 실시간 카드 그리드 -->
       <div id="realtimeCardGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </main>
 
     <!-- ================= 3. 설비별 불량집계 및 손실분석 ================= -->
     <main id="viewDefect" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-slate-50 text-slate-800 rounded-2xl my-4">
-      
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div class="flex items-center space-x-3">
           <div class="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-md">
@@ -426,7 +520,6 @@
         </div>
       </div>
 
-      <!-- Filter Section -->
       <div id="filterToolbarSection" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
           <div class="flex items-center gap-3">
@@ -468,7 +561,6 @@
         </div>
       </div>
 
-      <!-- KPI Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
           <span class="text-xs font-semibold text-slate-500">총 불량 수량</span>
@@ -498,7 +590,6 @@
         </div>
       </div>
 
-      <!-- Charts -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <h3 class="font-bold text-slate-800 text-sm sm:text-base mb-3 flex items-center gap-2">
@@ -518,7 +609,6 @@
         </div>
       </div>
 
-      <!-- Tables -->
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
           <div class="flex items-center gap-2">
@@ -581,7 +671,6 @@
         </div>
       </div>
 
-      <!-- 계획 KPI -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800">
           <span class="text-xs text-slate-400 font-semibold">총 계획 수량</span>
@@ -601,7 +690,6 @@
         </div>
       </div>
 
-      <!-- 계획 표 -->
       <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between">
           <h3 class="font-bold text-white text-sm">설비별 계획 vs 실적</h3>
@@ -681,14 +769,14 @@
 
   </div>
 
-  <!-- ================= 플로팅 화면 배율 컨트롤러 (모바일 간섭 방지: sm 이상 PC 화면에서만 표시) ================= -->
+  <!-- 플로팅 화면 배율 컨트롤러 -->
   <div class="zoom-toolbar hidden sm:flex">
     <button type="button" class="zoom-btn" onclick="zoomChange(0.1)" title="확대">+</button>
     <button type="button" class="zoom-btn" onclick="zoomChange(-0.1)" title="축소">−</button>
     <button type="button" class="zoom-btn" onclick="zoomReset()" style="font-size: 11px;">100%</button>
   </div>
 
-  <!-- ================= 관리자 전용 Worker 주소 변경 모달 (히든 트리거) ================= -->
+  <!-- 관리자 전용 Worker 주소 변경 모달 -->
   <div id="workerConfigModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -759,17 +847,13 @@
     <span id="toastMessage">알림</span>
   </div>
 
-  <!-- ================= 스크립트 로직 ================= -->
+  <!-- ================= 메인 비즈니스 스크립트 ================= -->
   <script>
-    // 0. 서비스 워커 등록 (PWA 설치 인식 활성화)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    // 관리자 고정 Worker API 주소 정의
     const HARDCODED_WORKER_URL = 'https://floral-wood-cc25.kim6665.workers.dev';
-
-    // 잘못 저장된 bul.kim6665.workers.dev 주소 강제 교정 및 고정값 적용
     let storedUrl = localStorage.getItem('jw_mes_worker_url');
     if (!storedUrl || storedUrl.includes('bul.kim6665.workers.dev')) {
       storedUrl = HARDCODED_WORKER_URL;
@@ -777,7 +861,6 @@
     }
     let workerApiUrl = storedUrl;
 
-    // 관리자 히든 트리거 (로고 5회 클릭 시 인증 후 모달 오픈)
     let secretClickCount = 0;
     let secretClickTimer = null;
     function handleLogoSecretClick() {
@@ -798,7 +881,6 @@
       }
     }
 
-    // 단축키 관리자 모드: Ctrl + Alt + M
     window.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'm') {
         const pass = prompt('관리자 암호를 입력하세요:');
@@ -828,7 +910,6 @@
       showToast('기본 주소로 초기화되었습니다.', 'info');
     }
 
-    // 1. 카카오톡 인앱 탈출 및 PWA 설치 이벤트
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -852,7 +933,7 @@
           deferredPrompt = null;
         });
       } else {
-        alert("브라우저 오른쪽 위 점 3개(⋮) 또는 줄 3개(≡) 메뉴를 누르고\n['홈 화면에 추가'] 또는 ['앱 설치']를 눌러주세요.");
+        alert("브라우저 오른쪽 위 메뉴(⋮ 또는 ≡)에서\n['홈 화면에 추가'] 또는 ['앱 설치']를 눌러주세요.");
       }
     }
 
@@ -862,9 +943,9 @@
       showToast('JW 생산현황 앱이 설치되었습니다.', 'success');
     });
 
-    // 2. 화면 전환 함수
+    // ★ 화면 전환 함수 (factory3d 탭 대응 포함)
     function switchDashboardView(viewName) {
-      const views = ['viewCover', 'viewRealtime', 'viewDefect', 'viewPlan'];
+      const views = ['viewCover', 'viewRealtime', 'viewFactory3d', 'viewDefect', 'viewPlan'];
       views.forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add('hidden');
@@ -873,6 +954,7 @@
       const tabs = {
         cover: 'navTabCover',
         realtime: 'navTabRealtime',
+        factory3d: 'navTabFactory3d',
         defect: 'navTabDefect',
         plan: 'navTabPlan'
       };
@@ -888,6 +970,11 @@
       } else if (viewName === 'realtime') {
         document.getElementById('viewRealtime').classList.remove('hidden');
         document.getElementById('navTabRealtime').className = "badge-pill bg-emerald-600 text-white border-emerald-500 shadow-sm";
+      } else if (viewName === 'factory3d') {
+        document.getElementById('viewFactory3d').classList.remove('hidden');
+        document.getElementById('navTabFactory3d').className = "badge-pill bg-sky-600 text-white border-sky-500 shadow-sm";
+        // 3D 캔버스 리사이즈 갱신 트리거
+        window.dispatchEvent(new Event('resize'));
       } else if (viewName === 'defect') {
         document.getElementById('viewDefect').classList.remove('hidden');
         document.getElementById('navTabDefect').className = "badge-pill bg-rose-600 text-white border-rose-500 shadow-sm";
@@ -901,7 +988,6 @@
       lucide.createIcons();
     }
 
-    // 3. 실시간 MES 모니터링 로직
     let realtimeMesList = [];
     let currentRtFilter = 'ALL';
     let currentRtCategoryFilter = 'ALL';
@@ -917,8 +1003,7 @@
       return '기타';
     }
 
-    const DEFAULT_MES_HTML = `<HTML> <HEAD> <TITLE>JW Monitoring</TITLE> </HEAD> <BODY> <CENTER> <h1>2026-11-06 오후 3:28:17</h1> </CENTER>
-    <CENTER><table><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>650톤 트렌스퍼 7호기<br><br>TMR CUTTER(프레스2)</h1></td><td align=center width = 350><h1><계획정지:7시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 0</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 1호기<br><br>UPPER AS (D037 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 4523</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김성재</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 2호기<br><br>UPPER AA (C021 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5848</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김현기</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 3호기<br><br>MOTOR CAN (SEBA : 프레스 TR)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5270</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>권별희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 1호기<br><br>LOWER 운전석1호 (D051 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 7265</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>신승격</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 2호기<br><br>UPPER PH5 EU (E111 프레스)</h1></td><td align=center width = 350><h1><순간비가동:0분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 2807</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>백남훈</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 3호기<br><br>LOWER PH5 EL (E111 프레스)</h1></td><td align=center width = 350><h1><측정대기:3분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 53</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>장규하</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 1호기<br><br>LIFT BASE BACK PLT(GEN2 프레스1)</h1></td><td align=center width = 350><h1><계획정지:3시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 8890</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 2호기<br><br>LOWER AJ (D111 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2208</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>문용학</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 400톤 1호기<br><br>DR PLT FLH (A100 프레스)</h1></td><td align=center width = 350><h1><계획정지:6시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 1086</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>로봇2라인 (250톤)<br><br>PULLEY (TD라인 2MHA1)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2869</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>이명희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>셔틀 400톤<br><br>PULLEY 9648 (구산 : 셔틀/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2181</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>최한희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 1호기<br><br>Ø124 블랭크 (2열) ( PH5 E116 공용)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 15886</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>미등록작업자</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 2호기<br><br>Ø132 블랭크 (AA/AD/AG )</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 10484</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>박종민</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>하우징 세척 A라인<br><br>UPPER AA (C021 세척/검사/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 8870</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김경희</h1></td></tr></table></CENTER> </BODY> </HTML>`;
+    const DEFAULT_MES_HTML = `<HTML><HEAD><TITLE>JW Monitoring</TITLE></HEAD><BODY><CENTER><h1>2026-11-06 오후 3:28:17</h1></CENTER><CENTER><table><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>650톤 트렌스퍼 7호기<br><br>TMR CUTTER(프레스2)</h1></td><td align=center width = 350><h1><계획정지:7시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 0</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 1호기<br><br>UPPER AS (D037 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 4523</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김성재</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 2호기<br><br>UPPER AA (C021 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5848</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김현기</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 500톤 3호기<br><br>MOTOR CAN (SEBA : 프레스 TR)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 5270</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>권별희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 1호기<br><br>LOWER 운전석1호 (D051 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 7265</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>신승격</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 2호기<br><br>UPPER PH5 EU (E111 프레스)</h1></td><td align=center width = 350><h1><순간비가동:0분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 2807</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>백남훈</h1></td></tr><tr style='background: #FAED7D;' class='small'><td rowspan='3' align=center width = 600><h1>대형 600톤 3호기<br><br>LOWER PH5 EL (E111 프레스)</h1></td><td align=center width = 350><h1><측정대기:3분↑> </h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>생산량 : 53</h1></td></tr><tr style='background: #FAED7D;' class='small'><td align=center><h1>장규하</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 1호기<br><br>LIFT BASE BACK PLT(GEN2 프레스1)</h1></td><td align=center width = 350><h1><계획정지:3시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 8890</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>대형 800톤 2호기<br><br>LOWER AJ (D111 프레스)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2208</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>문용학</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td rowspan='3' align=center width = 600><h1>대형 400톤 1호기<br><br>DR PLT FLH (A100 프레스)</h1></td><td align=center width = 350><h1><계획정지:6시간↑> </h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1>생산량 : 1086</h1></td></tr><tr style='background: #D5D5D5;' class='small'><td align=center><h1></h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>로봇2라인 (250톤)<br><br>PULLEY (TD라인 2MHA1)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2869</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>이명희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>셔틀 400톤<br><br>PULLEY 9648 (구산 : 셔틀/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 2181</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>최한희</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 1호기<br><br>Ø124 블랭크 (2열) ( PH5 E116 공용)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 15886</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>미등록작업자</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>소형 250톤 2호기<br><br>Ø132 블랭크 (AA/AD/AG )</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 10484</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>박종민</h1></td></tr><tr style='background: #BCE55C;' class='small'><td rowspan='3' align=center width = 600><h1>하우징 세척 A라인<br><br>UPPER AA (C021 세척/검사/제품)</h1></td><td align=center width = 350><h1>설비가동</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>생산량 : 8870</h1></td></tr><tr style='background: #BCE55C;' class='small'><td align=center><h1>김경희</h1></td></tr></table></CENTER></BODY></HTML>`;
 
     function parseMesHtml(htmlString) {
       const timeMatch = htmlString.match(/<h1>(\d{4}-\d{2}-\d{2}[^<]+)<\/h1>/);
@@ -1103,7 +1188,6 @@
       if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
     }
 
-    // 줌 컨트롤 함수
     let currentScale = 1.0;
     function zoomChange(delta) {
       currentScale = Math.min(Math.max(currentScale + delta, 0.6), 2.5);
@@ -1113,19 +1197,6 @@
       currentScale = 1.0;
       document.body.style.zoom = 1.0;
     }
-
-    // 불량 집계 대시보드 로직
-    const DEFECT_KEYS = [
-      { key: 'mat', label: '소재불량(녹)' },
-      { key: 'setup', label: '셋업품' },
-      { key: 'dimSec', label: '치수확보불량품' },
-      { key: 'burr', label: 'BURR(HOLE)' },
-      { key: 'dent', label: '찍힘' },
-      { key: 'scratch', label: '스크래치(긁힘)' },
-      { key: 'dimGauge', label: '치수불량(게이지)' },
-      { key: 'shape', label: '형상불량(타각NG)' },
-      { key: 'marking', label: '마킹불량(홀누락)' }
-    ];
 
     const STANDARD_MACHINES = [
       { name: '대형 500톤 1호기', group: '대형프레스(TR)' },
@@ -1146,7 +1217,6 @@
       { name: '셔틀 400톤', group: '자동화 프레스' },
       { name: '650톤 트렌스퍼 1호기', group: '자동화 프레스' }
     ];
-
     const ORDERED_GROUPS = ['대형프레스(TR)', '대형프레스(PR)', '소형프레스', '자동화 프레스'];
     let weeklyDefectRecords = [];
     let periodMode = 'weekly';
@@ -1310,7 +1380,7 @@
       setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none'), 3000);
     }
 
-    // 초기화 진입
+    // 기본 초기화 진입
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       parseMesHtml(DEFAULT_MES_HTML);
@@ -1318,13 +1388,15 @@
       initDefectCharts();
       updateDefectDashboard();
 
-      // 지정된 백엔드 Worker로 즉시 자동 동기화 시작 (30초 주기)
       if (workerApiUrl) {
         refreshMesData();
         setInterval(refreshMesData, 30000);
       }
     });
   </script>
+
+  <!-- ================= GitHub에 올리신 3D 통합 메인 스크립트 연결 ================= -->
+  <script type="module" src="./src/main.js"></script>
   <script src="plan.js" charset="utf-8"></script>
 </body>
 </html>
